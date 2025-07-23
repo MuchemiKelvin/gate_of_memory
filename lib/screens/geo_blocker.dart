@@ -14,6 +14,7 @@ class GeoBlocker extends StatefulWidget {
 class _GeoBlockerState extends State<GeoBlocker> {
   bool? _allowed;
   String? _fallbackMessage;
+  String? _detectedCountry;
 
   @override
   void initState() {
@@ -24,6 +25,7 @@ class _GeoBlockerState extends State<GeoBlocker> {
   Future<void> _checkGeoBlocking() async {
     bool allowed = false;
     String? fallback;
+    String? countryForMessage;
     try {
       // 1. GPS Country
       String? gpsCountry;
@@ -43,6 +45,9 @@ class _GeoBlockerState extends State<GeoBlocker> {
       // 2. Device Locale
       String localeCountry = window.locale.countryCode?.toUpperCase() ?? '';
 
+      // Prefer GPS, then locale for message
+      countryForMessage = gpsCountry ?? localeCountry;
+
       // Allow if any check passes
       if (gpsCountry == 'KE' || localeCountry == 'KE') {
         allowed = true;
@@ -55,6 +60,7 @@ class _GeoBlockerState extends State<GeoBlocker> {
     setState(() {
       _allowed = allowed;
       _fallbackMessage = fallback;
+      _detectedCountry = countryForMessage;
     });
   }
 
@@ -76,10 +82,13 @@ class _GeoBlockerState extends State<GeoBlocker> {
         ),
       );
     } else {
+      String countryMsg = _detectedCountry != null && _detectedCountry!.isNotEmpty
+        ? 'You are currently in ${_detectedCountry!}. This app is restricted to users within Kenya.'
+        : 'This app is restricted to users within Kenya.';
       return _GeoBlockerScaffold(
         child: _GeoBlockerDialog(
           title: 'Access Denied',
-          message: 'This app is restricted to users within Kenya.',
+          message: countryMsg,
           buttonText: 'Exit',
           onButton: () => Navigator.of(context).pop(),
         ),
