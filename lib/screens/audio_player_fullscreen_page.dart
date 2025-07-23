@@ -11,50 +11,53 @@ class AudioPlayerFullscreenPage extends StatefulWidget {
 }
 
 class _AudioPlayerFullscreenPageState extends State<AudioPlayerFullscreenPage> {
-  late AudioPlayer _audioPlayer;
+  AudioPlayer? _audioPlayer;
   bool _isPlaying = false;
-  Duration _duration = Duration.zero;
+  Duration _duration = Duration(minutes: 2, seconds: 30); // Dummy default
   Duration _position = Duration.zero;
   bool _isLoaded = false;
 
   @override
   void initState() {
     super.initState();
-    _audioPlayer = AudioPlayer();
-    _audioPlayer.setSourceAsset(widget.audioPath).then((_) {
+    // Show UI immediately, then load audio after first frame
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      _audioPlayer = AudioPlayer();
+      await _audioPlayer!.setSourceAsset(widget.audioPath);
+      _audioPlayer!.onDurationChanged.listen((d) {
+        setState(() {
+          _duration = d;
+        });
+      });
+      _audioPlayer!.onPositionChanged.listen((p) {
+        setState(() {
+          _position = p;
+        });
+      });
+      _audioPlayer!.onPlayerComplete.listen((event) {
+        setState(() {
+          _isPlaying = false;
+          _position = Duration.zero;
+        });
+      });
       setState(() {
         _isLoaded = true;
-      });
-    });
-    _audioPlayer.onDurationChanged.listen((d) {
-      setState(() {
-        _duration = d;
-      });
-    });
-    _audioPlayer.onPositionChanged.listen((p) {
-      setState(() {
-        _position = p;
-      });
-    });
-    _audioPlayer.onPlayerComplete.listen((event) {
-      setState(() {
-        _isPlaying = false;
-        _position = Duration.zero;
       });
     });
   }
 
   @override
   void dispose() {
-    _audioPlayer.dispose();
+    _audioPlayer?.dispose();
     super.dispose();
   }
 
   void _togglePlayPause() async {
+    if (_audioPlayer == null) return;
     if (_isPlaying) {
-      await _audioPlayer.pause();
+      await _audioPlayer!.pause();
     } else {
-      await _audioPlayer.resume();
+      await _audioPlayer!.resume();
     }
     setState(() {
       _isPlaying = !_isPlaying;
@@ -62,8 +65,16 @@ class _AudioPlayerFullscreenPageState extends State<AudioPlayerFullscreenPage> {
   }
 
   void _seek(double value) {
+    if (_audioPlayer == null) return;
     final newPosition = Duration(milliseconds: value.toInt());
-    _audioPlayer.seek(newPosition);
+    _audioPlayer!.seek(newPosition);
+  }
+
+  String _formatDuration(Duration d) {
+    String twoDigits(int n) => n.toString().padLeft(2, '0');
+    final minutes = twoDigits(d.inMinutes.remainder(60));
+    final seconds = twoDigits(d.inSeconds.remainder(60));
+    return '$minutes:$seconds';
   }
 
   @override
@@ -92,87 +103,78 @@ class _AudioPlayerFullscreenPageState extends State<AudioPlayerFullscreenPage> {
             end: Alignment.bottomRight,
           ),
         ),
-        child: _isLoaded
-            ? Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Profile avatar
+            CircleAvatar(
+              radius: 36,
+              backgroundColor: Color(0xFFeab676),
+              child: Icon(Icons.person, size: 48, color: Color(0xFFa05a00)),
+            ),
+            SizedBox(height: 16),
+            Text(
+              widget.title,
+              style: TextStyle(fontSize: 24, color: Color(0xFF2d3a4a), fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 8),
+            Text(
+              'Lorem ipsum dolors amet, consectetur',
+              style: TextStyle(fontSize: 16, color: Color(0xFF4a5a6a)),
+            ),
+            SizedBox(height: 16),
+            Container(
+              width: 120,
+              height: 2,
+              color: Color(0xFFd3bfa7),
+            ),
+            SizedBox(height: 32),
+            // Large play/pause and music icon in a colored rounded rectangle
+            Container(
+              decoration: BoxDecoration(
+                color: Color(0xFFeab676),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              padding: EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Profile avatar
-                  CircleAvatar(
-                    radius: 36,
-                    backgroundColor: Color(0xFFeab676),
-                    child: Icon(Icons.person, size: 48, color: Color(0xFFa05a00)),
+                  IconButton(
+                    icon: Icon(_isPlaying ? Icons.pause : Icons.play_arrow, color: Colors.white, size: 36),
+                    onPressed: _isLoaded ? _togglePlayPause : null,
                   ),
-                  SizedBox(height: 16),
-                  Text(
-                    widget.title,
-                    style: TextStyle(fontSize: 24, color: Color(0xFF2d3a4a), fontWeight: FontWeight.bold),
+                  SizedBox(width: 16),
+                  Icon(Icons.music_note, color: Colors.white, size: 36),
+                ],
+              ),
+            ),
+            SizedBox(height: 32),
+            // Progress bar
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32.0),
+              child: Column(
+                children: [
+                  Slider(
+                    value: _position.inMilliseconds.toDouble(),
+                    min: 0,
+                    max: _duration.inMilliseconds.toDouble() > 0 ? _duration.inMilliseconds.toDouble() : 1,
+                    onChanged: _isLoaded ? (value) => _seek(value) : null,
+                    activeColor: Color(0xFF7bb6e7),
+                    inactiveColor: Colors.white24,
                   ),
-                  SizedBox(height: 8),
-                  Text(
-                    'Lorem ipsum dolors amet, consectetur',
-                    style: TextStyle(fontSize: 16, color: Color(0xFF4a5a6a)),
-                  ),
-                  SizedBox(height: 16),
-                  Container(
-                    width: 120,
-                    height: 2,
-                    color: Color(0xFFd3bfa7),
-                  ),
-                  SizedBox(height: 32),
-                  // Large play/pause and music icon in a colored rounded rectangle
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Color(0xFFeab676),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    padding: EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          icon: Icon(_isPlaying ? Icons.pause : Icons.play_arrow, color: Colors.white, size: 36),
-                          onPressed: _togglePlayPause,
-                        ),
-                        SizedBox(width: 16),
-                        Icon(Icons.music_note, color: Colors.white, size: 36),
-                      ],
-                    ),
-                  ),
-                  SizedBox(height: 32),
-                  // Progress bar
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 32.0),
-                    child: Column(
-                      children: [
-                        Slider(
-                          value: _position.inMilliseconds.toDouble(),
-                          min: 0,
-                          max: _duration.inMilliseconds.toDouble() > 0 ? _duration.inMilliseconds.toDouble() : 1,
-                          onChanged: (value) => _seek(value),
-                          activeColor: Color(0xFF7bb6e7),
-                          inactiveColor: Colors.white24,
-                        ),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(_formatDuration(_position), style: TextStyle(color: Color(0xFF4a5a6a))),
-                            Text(_formatDuration(_duration), style: TextStyle(color: Color(0xFF4a5a6a))),
-                          ],
-                        ),
-                      ],
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(_formatDuration(_position), style: TextStyle(color: Color(0xFF4a5a6a))),
+                      Text(_formatDuration(_duration), style: TextStyle(color: Color(0xFF4a5a6a))),
+                    ],
                   ),
                 ],
-              )
-            : Center(child: CircularProgressIndicator(color: Color(0xFF7bb6e7))),
+              ),
+            ),
+          ],
+        ),
       ),
     );
-  }
-
-  String _formatDuration(Duration d) {
-    String twoDigits(int n) => n.toString().padLeft(2, '0');
-    final minutes = twoDigits(d.inMinutes.remainder(60));
-    final seconds = twoDigits(d.inSeconds.remainder(60));
-    return '$minutes:$seconds';
   }
 } 
