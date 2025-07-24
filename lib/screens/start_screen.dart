@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'gate_screen.dart';
+import 'scan_screen.dart'; // Added import for ScanScreen
 
 class StartScreen extends StatelessWidget {
   @override
@@ -43,6 +44,32 @@ class StartScreen extends StatelessWidget {
                 backgroundColor: Colors.white,
               ),
               SizedBox(height: 32),
+              // Modern Scan QR/Barcode button
+              ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => ScanScreen()),
+                  );
+                },
+                icon: Icon(Icons.qr_code_scanner, size: 24),
+                label: Text(
+                  'Scan QR/Barcode',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: 1),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Color(0xFF2d3a4a),
+                  foregroundColor: Colors.white,
+                  elevation: 10,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  padding: EdgeInsets.symmetric(horizontal: 36, vertical: 16),
+                  shadowColor: Color(0xFF2d3a4a).withOpacity(0.3),
+                ),
+              ),
+              SizedBox(height: 16),
+              // Existing Scan button for GateScreen
               ElevatedButton(
                 onPressed: () {
                   Navigator.push(
@@ -61,7 +88,7 @@ class StartScreen extends StatelessWidget {
                   shadowColor: Color(0xFF7bb6e7).withOpacity(0.4),
                 ),
                 child: Text(
-                  'Scan',
+                  'Enter',
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: 1),
                 ),
               ),
