@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import '../services/location_service.dart';
+import 'package:flutter/services.dart';
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 class GeoBlocker extends StatefulWidget {
   final Widget child;
@@ -125,7 +128,27 @@ class _GeoBlockerState extends State<GeoBlocker> {
           message: countryMsg,
           buttonText: 'Exit',
           secondaryButtonText: 'Retry',
-          onButton: () => Navigator.of(context).pop(),
+          onButton: () async {
+            if (kIsWeb) {
+              // On web, show a goodbye dialog
+              showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: Text('Goodbye!'),
+                  content: Text('Thank you for using Gate of Memory.'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: Text('Close'),
+                    ),
+                  ],
+                ),
+              );
+            } else {
+              // On mobile/desktop, close the app
+              await SystemNavigator.pop();
+            }
+          },
           onSecondaryButton: _retryLocationCheck,
           isRetrying: _isRetrying,
           showLocationMethods: true,
