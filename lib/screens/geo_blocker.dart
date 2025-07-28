@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:geolocator/geolocator.dart';
-import 'package:geocoding/geocoding.dart';
-import 'dart:ui';
+import '../services/location_service.dart';
 
 class GeoBlocker extends StatefulWidget {
   final Widget child;
@@ -15,6 +13,11 @@ class _GeoBlockerState extends State<GeoBlocker> {
   bool? _allowed;
   String? _fallbackMessage;
   String? _detectedCountry;
+  String? _detectedCity;
+  bool _isLoading = true;
+  bool _isRetrying = false;
+  LocationStatus _locationStatus = LocationStatus.checking;
+  List<String> _locationMethods = [];
 
   @override
   void initState() {
@@ -23,77 +26,177 @@ class _GeoBlockerState extends State<GeoBlocker> {
   }
 
   Future<void> _checkGeoBlocking() async {
-    bool allowed = false;
-    String? fallback;
-    String? countryForMessage;
-    try {
-      // 1. GPS Country
-      String? gpsCountry;
-      try {
-        bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-        LocationPermission permission = await Geolocator.checkPermission();
-        if (!serviceEnabled || permission == LocationPermission.denied) {
-          permission = await Geolocator.requestPermission();
-        }
-        if (permission == LocationPermission.whileInUse || permission == LocationPermission.always) {
-          Position pos = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
-          List<Placemark> placemarks = await placemarkFromCoordinates(pos.latitude, pos.longitude);
-          gpsCountry = placemarks.first.isoCountryCode;
-        }
-      } catch (_) {}
-
-      // 2. Device Locale
-      String localeCountry = window.locale.countryCode?.toUpperCase() ?? '';
-
-      // Prefer GPS, then locale for message
-      countryForMessage = gpsCountry ?? localeCountry;
-
-      // Allow if any check passes
-      if (gpsCountry == 'KE' || localeCountry == 'KE') {
-        allowed = true;
-      } else if (gpsCountry == null && localeCountry.isEmpty) {
-        fallback = 'Location could not be verified. Please enable GPS or connect to a network in Kenya.';
-      }
-    } catch (e) {
-      fallback = 'Location could not be verified. Please enable GPS or connect to a network in Kenya.';
-    }
     setState(() {
-      _allowed = allowed;
-      _fallbackMessage = fallback;
-      _detectedCountry = countryForMessage;
+      _isLoading = true;
+      _locationStatus = LocationStatus.checking;
+      _locationMethods.clear();
     });
+
+    try {
+      final result = await LocationService.checkLocationAccess();
+      
+      setState(() {
+        _allowed = result.isAllowed;
+        _detectedCountry = result.country;
+        _detectedCity = result.city;
+        _locationMethods = result.detectionMethods;
+        _isLoading = false;
+        
+        if (result.isAllowed) {
+          _locationStatus = LocationStatus.allowed;
+        } else if (result.error != null) {
+          _locationStatus = LocationStatus.error;
+          _fallbackMessage = result.error!.message;
+        } else if (result.country != null && result.country!.isNotEmpty) {
+          _locationStatus = LocationStatus.blocked;
+        } else {
+          _locationStatus = LocationStatus.unavailable;
+          _fallbackMessage = 'Location could not be verified. Please enable GPS or connect to a network in Kenya.';
+        }
+      });
+    } catch (e) {
+      setState(() {
+        _locationStatus = LocationStatus.error;
+        _fallbackMessage = 'An error occurred while checking your location. Please try again.';
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _retryLocationCheck() async {
+    setState(() {
+      _isRetrying = true;
+    });
+    
+    await _checkGeoBlocking();
+    
+    setState(() {
+      _isRetrying = false;
+    });
+  }
+
+  Future<void> _openLocationSettings() async {
+    try {
+      await LocationService.openLocationSettings();
+    } catch (e) {
+      // Handle case where settings can't be opened
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Please enable location services in your device settings.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_allowed == null) {
+    if (_isLoading) {
       return _GeoBlockerScaffold(
-        child: Center(child: CircularProgressIndicator(color: Color(0xFF7bb6e7))),
+        child: _LoadingView(),
       );
     } else if (_allowed == true) {
       return widget.child;
-    } else if (_fallbackMessage != null) {
+    } else if (_locationStatus == LocationStatus.unavailable || _fallbackMessage != null) {
       return _GeoBlockerScaffold(
         child: _GeoBlockerDialog(
           title: 'Location could not be verified',
           message: _fallbackMessage!,
-          buttonText: 'OK',
-          onButton: () => Navigator.of(context).pop(),
+          buttonText: 'Retry',
+          secondaryButtonText: 'Location Settings',
+          onButton: _retryLocationCheck,
+          onSecondaryButton: () {
+            // Use a post-frame callback to ensure we're in the correct context
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              Navigator.of(context).pushNamed('/location-settings');
+            });
+          },
+          isRetrying: _isRetrying,
         ),
       );
     } else {
       String countryMsg = _detectedCountry != null && _detectedCountry!.isNotEmpty
-        ? 'You are currently in ${_detectedCountry!}. This app is restricted to users within Kenya.'
+        ? 'You are currently in ${_detectedCity != null ? "$_detectedCity, " : ""}${_detectedCountry!}. This app is restricted to users within Kenya.'
         : 'This app is restricted to users within Kenya.';
+      
       return _GeoBlockerScaffold(
         child: _GeoBlockerDialog(
           title: 'Access Denied',
           message: countryMsg,
           buttonText: 'Exit',
+          secondaryButtonText: 'Retry',
           onButton: () => Navigator.of(context).pop(),
+          onSecondaryButton: _retryLocationCheck,
+          isRetrying: _isRetrying,
+          showLocationMethods: true,
+          locationMethods: _locationMethods,
         ),
       );
     }
+  }
+}
+
+enum LocationStatus {
+  checking,
+  allowed,
+  blocked,
+  unavailable,
+  error,
+}
+
+class _LoadingView extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 80,
+            height: 80,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.9),
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 10,
+                  spreadRadius: 2,
+                ),
+              ],
+            ),
+            child: Icon(
+              Icons.location_searching,
+              size: 40,
+              color: Color(0xFF7bb6e7),
+            ),
+          ),
+          SizedBox(height: 24),
+          Text(
+            'Verifying your location...',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF2d3a4a),
+            ),
+          ),
+          SizedBox(height: 16),
+          Text(
+            'Please ensure location services are enabled',
+            style: TextStyle(
+              fontSize: 14,
+              color: Color(0xFF4a5a6a),
+            ),
+            textAlign: TextAlign.center,
+          ),
+          SizedBox(height: 32),
+          CircularProgressIndicator(
+            color: Color(0xFF7bb6e7),
+            strokeWidth: 3,
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -128,37 +231,144 @@ class _GeoBlockerDialog extends StatelessWidget {
   final String title;
   final String message;
   final String buttonText;
+  final String? secondaryButtonText;
   final VoidCallback onButton;
-  const _GeoBlockerDialog({required this.title, required this.message, required this.buttonText, required this.onButton});
+  final VoidCallback? onSecondaryButton;
+  final bool isRetrying;
+  final bool showLocationMethods;
+  final List<String> locationMethods;
+
+  const _GeoBlockerDialog({
+    required this.title,
+    required this.message,
+    required this.buttonText,
+    this.secondaryButtonText,
+    required this.onButton,
+    this.onSecondaryButton,
+    this.isRetrying = false,
+    this.showLocationMethods = false,
+    this.locationMethods = const [],
+  });
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: Card(
-        elevation: 8,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        color: Colors.white.withOpacity(0.97),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.location_off, color: Color(0xFF7bb6e7), size: 48),
-              SizedBox(height: 24),
-              Text(title, style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF2d3a4a)), textAlign: TextAlign.center),
-              SizedBox(height: 16),
-              Text(message, style: TextStyle(fontSize: 16, color: Color(0xFF4a5a6a)), textAlign: TextAlign.center),
-              SizedBox(height: 32),
-              ElevatedButton(
-                onPressed: onButton,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Color(0xFF7bb6e7),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  padding: EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+      child: SingleChildScrollView(
+        child: Card(
+          elevation: 8,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          color: Colors.white.withOpacity(0.97),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  title.contains('Denied') ? Icons.location_off : Icons.location_on,
+                  color: Color(0xFF7bb6e7),
+                  size: 48,
                 ),
-                child: Text(buttonText, style: TextStyle(fontSize: 16)),
-              ),
-            ],
+                SizedBox(height: 24),
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF2d3a4a),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                SizedBox(height: 16),
+                Text(
+                  message,
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Color(0xFF4a5a6a),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                if (showLocationMethods && locationMethods.isNotEmpty) ...[
+                  SizedBox(height: 24),
+                  Container(
+                    padding: EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Color(0xFFf8f9fa),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Color(0xFFe9ecef)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Location Detection Methods:',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF2d3a4a),
+                          ),
+                        ),
+                        SizedBox(height: 8),
+                        ...locationMethods.map((method) => Padding(
+                          padding: EdgeInsets.only(bottom: 4),
+                          child: Text(
+                            '• $method',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF6c757d),
+                            ),
+                          ),
+                        )).toList(),
+                      ],
+                    ),
+                  ),
+                ],
+                SizedBox(height: 32),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    if (secondaryButtonText != null) ...[
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: isRetrying ? null : onSecondaryButton,
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Color(0xFF7bb6e7),
+                            side: BorderSide(color: Color(0xFF7bb6e7)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            padding: EdgeInsets.symmetric(vertical: 16),
+                          ),
+                          child: Text(secondaryButtonText!),
+                        ),
+                      ),
+                      SizedBox(width: 16),
+                    ],
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: isRetrying ? null : onButton,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Color(0xFF7bb6e7),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          padding: EdgeInsets.symmetric(vertical: 16),
+                        ),
+                        child: isRetrying
+                            ? SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                ),
+                              )
+                            : Text(buttonText),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
