@@ -37,8 +37,13 @@ class _LocationSettingsScreenState extends State<LocationSettingsScreen> {
           _permissionStatus == LocationPermission.always) {
         try {
           final result = await LocationService.checkLocationAccess();
-          _currentLocation = result.city;
-          _currentCountry = result.country;
+          _currentLocation = result.latitude != null && result.longitude != null
+              ? 'Lat: ${result.latitude!.toStringAsFixed(4)}, Lon: ${result.longitude!.toStringAsFixed(4)}'
+              : null;
+          _currentCountry = result.isAllowed ? 'Kenya' : null;
+          if (!result.isAllowed && result.errorMessage != null) {
+            _currentLocation = result.errorMessage;
+          }
         } catch (e) {
           // Location fetch failed, but that's okay
         }
@@ -196,10 +201,10 @@ class _LocationSettingsScreenState extends State<LocationSettingsScreen> {
                     SizedBox(height: 16),
                     
                     // Current Location (if available)
-                    if (_currentLocation != null && _currentCountry != null)
+                    if (_currentLocation != null)
                       _buildStatusCard(
                         title: 'Current Location',
-                        subtitle: '$_currentLocation, ${LocationService.getCountryName(_currentCountry!)}',
+                        subtitle: _currentLocation!,
                         icon: Icons.my_location,
                         color: Colors.blue,
                         action: null,

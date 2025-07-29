@@ -38,15 +38,10 @@ class _LocationDebugScreenState extends State<LocationDebugScreen> {
       
       _debugInfo += '🎯 Location Check Result:\n';
       _debugInfo += '   Allowed: ${result.isAllowed}\n';
-      _debugInfo += '   Country: ${result.country ?? 'null'}\n';
-      _debugInfo += '   City: ${result.city ?? 'null'}\n';
-      _debugInfo += '   Error: ${result.error?.message ?? 'none'}\n\n';
+      _debugInfo += '   Latitude: ${result.latitude ?? 'null'}\n';
+      _debugInfo += '   Longitude: ${result.longitude ?? 'null'}\n';
+      _debugInfo += '   Error: ${result.errorMessage ?? 'none'}\n\n';
       
-      _debugInfo += '📋 Detection Methods:\n';
-      for (String method in result.detectionMethods) {
-        _debugInfo += '   • $method\n';
-      }
-
       setState(() {
         _result = result;
         _isLoading = false;
@@ -158,10 +153,10 @@ class _LocationDebugScreenState extends State<LocationDebugScreen> {
                                 ),
                               ),
                               SizedBox(height: 12),
-                              _buildDetailRow('Country', _result!.country ?? 'Unknown'),
-                              _buildDetailRow('City', _result!.city ?? 'Unknown'),
-                              if (_result!.error != null)
-                                _buildDetailRow('Error', _result!.error!.message, isError: true),
+                              _buildDetailRow('Latitude', _result!.latitude?.toStringAsFixed(6) ?? 'Unknown'),
+                              _buildDetailRow('Longitude', _result!.longitude?.toStringAsFixed(6) ?? 'Unknown'),
+                              if (_result!.errorMessage != null)
+                                _buildDetailRow('Error', _result!.errorMessage!, isError: true),
                             ],
                           ),
                         ),

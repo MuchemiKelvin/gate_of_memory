@@ -40,18 +40,18 @@ class _GeoBlockerState extends State<GeoBlocker> {
       
       setState(() {
         _allowed = result.isAllowed;
-        _detectedCountry = result.country;
-        _detectedCity = result.city;
-        _locationMethods = result.detectionMethods;
+        _detectedCountry = result.latitude != null && result.longitude != null
+          ? 'Lat:  {result.latitude!.toStringAsFixed(4)}, Lon:  {result.longitude!.toStringAsFixed(4)}'
+          : null;
+        _detectedCity = null;
+        _locationMethods = [];
         _isLoading = false;
         
         if (result.isAllowed) {
           _locationStatus = LocationStatus.allowed;
-        } else if (result.error != null) {
+        } else if (result.errorMessage != null) {
           _locationStatus = LocationStatus.error;
-          _fallbackMessage = result.error!.message;
-        } else if (result.country != null && result.country!.isNotEmpty) {
-          _locationStatus = LocationStatus.blocked;
+          _fallbackMessage = result.errorMessage;
         } else {
           _locationStatus = LocationStatus.unavailable;
           _fallbackMessage = 'Location could not be verified. Please enable GPS or connect to a network in Kenya.';
@@ -119,7 +119,7 @@ class _GeoBlockerState extends State<GeoBlocker> {
       );
     } else {
       String countryMsg = _detectedCountry != null && _detectedCountry!.isNotEmpty
-        ? 'You are currently in ${_detectedCity != null ? "$_detectedCity, " : ""}${_detectedCountry!}. This app is restricted to users within Kenya.'
+        ? 'Your coordinates:  {_detectedCountry!}. This app is restricted to users within Kenya.'
         : 'This app is restricted to users within Kenya.';
       
       return _GeoBlockerScaffold(
