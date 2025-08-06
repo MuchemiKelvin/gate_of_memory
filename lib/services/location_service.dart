@@ -65,7 +65,7 @@ class LocationService {
     } catch (e) {
       return LocationResult(
         isAllowed: false,
-        errorMessage: 'Location could not be verified. Please enable GPS or connect to a network in Kenya.',
+        errorMessage: 'Location could not be verified. Please enable GPS or Turn on Location Services',
       );
     }
   }
