@@ -1,4 +1,4 @@
-# Gate of Memory - Project Requirements Documentation
+# Kardiverse Mobile - Project Requirements Documentation
 
 ## Project Objective
 Develop a new version of the offline Android APK with the following features:

@@ -11,7 +11,7 @@ void main() {
   runApp(
     MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Gate of Memory',
+      title: 'Kardiverse Mobile',
       initialRoute: '/',
       builder: (context, child) => GeoBlocker(child: child ?? Container()),
       routes: {

@@ -1,6 +1,6 @@
-# gate_of_memory
+# Kardiverse Mobile
 
-A new Flutter project.
+A Flutter application for digital memorial content management and QR-based access control.
 
 ## Getting Started
 

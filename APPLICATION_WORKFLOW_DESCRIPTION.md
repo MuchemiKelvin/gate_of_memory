@@ -1,7 +1,7 @@
-# Gate of Memory - Application Workflow Description
+# Kardiverse Mobile - Application Workflow Description
 
 ## Application Overview
-**Gate of Memory** is an offline Android application that provides access to memorial content through QR/barcode scanning, with access restricted to users located within Kenya.
+**Kardiverse Mobile** is an offline Android application that provides access to memorial content through QR/barcode scanning, with access restricted to users located within Kenya.
 
 ## How the Application Works
 
@@ -12,7 +12,7 @@
 - If inside Kenya: App proceeds to main screen
 
 ### 2. **Main Screen (Start Screen)**
-- Displays app title "Gate Of Memory"
+- Displays app title "Kardiverse Mobile"
 - Shows a QR code with identifier "GATE-OF-MEMORY-QR"
 - Provides "Scan QR/Barcode" button to access scanning functionality
 

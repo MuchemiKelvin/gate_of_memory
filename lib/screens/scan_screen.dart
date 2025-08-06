@@ -7,7 +7,7 @@ class ScanScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Scan a Memorial QR Code'),
+        title: Text('Scan a Kardiverse QR Code'),
         // Use theme color
         backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
         foregroundColor: Theme.of(context).appBarTheme.foregroundColor,

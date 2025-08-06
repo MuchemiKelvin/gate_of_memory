@@ -28,7 +28,7 @@ class StartScreen extends StatelessWidget {
             children: [
               SizedBox(height: 32),
               Text(
-                'Gate Of Memory',
+                'Kardiverse Mobile',
                 style: TextStyle(
                   fontSize: 32,
                   fontWeight: FontWeight.bold,
@@ -39,7 +39,7 @@ class StartScreen extends StatelessWidget {
               ),
               SizedBox(height: 32),
               QrImageView(
-                data: 'GATE-OF-MEMORY-QR',
+                data: 'KARDIVERSE-MOBILE-QR',
                 size: 180,
                 backgroundColor: Colors.white,
               ),

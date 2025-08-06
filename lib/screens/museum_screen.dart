@@ -12,7 +12,7 @@ class MuseumScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Museum of Memories'),
+        title: Text('Kardiverse Gallery'),
         backgroundColor: Color(0xFF7B4F1D),
       ),
       backgroundColor: const Color(0xFFFFF8E1),
