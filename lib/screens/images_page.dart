@@ -2,6 +2,13 @@ import 'package:flutter/material.dart';
 import 'image_viewer_page.dart';
 
 class ImagesPage extends StatefulWidget {
+  final List<String> imagePaths;
+  
+  const ImagesPage({
+    super.key,
+    required this.imagePaths,
+  });
+
   @override
   _ImagesPageState createState() => _ImagesPageState();
 }
@@ -9,19 +16,14 @@ class ImagesPage extends StatefulWidget {
 class _ImagesPageState extends State<ImagesPage> {
   bool isGrid = true;
 
-  // Sample image asset paths (replace with your own as needed)
-  final List<String> images = [
-    'assets/images/memorial_card.jpeg',
-    'assets/images/memorial_card.jpeg',
-    'assets/images/memorial_card.jpeg',
-    'assets/images/memorial_card.jpeg',
-  ];
-
   void _openImageViewer(int index) {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => ImageViewerPage(images: images, initialIndex: index),
+        builder: (_) => ImageViewerPage(
+          images: widget.imagePaths, 
+          initialIndex: index
+        ),
       ),
     );
   }
@@ -30,7 +32,7 @@ class _ImagesPageState extends State<ImagesPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Images'),
+        title: Text('Images (${widget.imagePaths.length})'),
         backgroundColor: Color(0xFF7bb6e7),
         actions: [
           IconButton(
@@ -56,60 +58,102 @@ class _ImagesPageState extends State<ImagesPage> {
             end: Alignment.bottomRight,
           ),
         ),
-        child: isGrid
-            ? GridView.builder(
-                padding: EdgeInsets.all(16),
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  mainAxisSpacing: 16,
-                  crossAxisSpacing: 16,
-                  childAspectRatio: 1,
+        child: widget.imagePaths.isEmpty
+            ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.image_not_supported,
+                      size: 64,
+                      color: Colors.grey[400],
+                    ),
+                    SizedBox(height: 16),
+                    Text(
+                      'No images available',
+                      style: TextStyle(
+                        color: Colors.grey[600],
+                        fontSize: 16,
+                      ),
+                    ),
+                  ],
                 ),
-                itemCount: images.length,
-                itemBuilder: (context, index) {
-                  return GestureDetector(
-                    onTap: () => _openImageViewer(index),
-                    child: Card(
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      elevation: 4,
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(16),
-                        child: Image.asset(
-                          images[index],
-                          fit: BoxFit.cover,
-                        ),
-                      ),
-                    ),
-                  );
-                },
               )
-            : ListView.builder(
-                padding: EdgeInsets.all(16),
-                itemCount: images.length,
-                itemBuilder: (context, index) {
-                  return GestureDetector(
-                    onTap: () => _openImageViewer(index),
-                    child: Card(
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      elevation: 4,
-                      margin: EdgeInsets.only(bottom: 16),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(16),
-                        child: Image.asset(
-                          images[index],
-                          fit: BoxFit.cover,
-                          height: 180,
-                          width: double.infinity,
-                        ),
-                      ),
+            : isGrid
+                ? GridView.builder(
+                    padding: EdgeInsets.all(16),
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      mainAxisSpacing: 16,
+                      crossAxisSpacing: 16,
+                      childAspectRatio: 1,
                     ),
-                  );
-                },
-              ),
+                    itemCount: widget.imagePaths.length,
+                    itemBuilder: (context, index) {
+                      return GestureDetector(
+                        onTap: () => _openImageViewer(index),
+                        child: Card(
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          elevation: 4,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(16),
+                            child: Image.asset(
+                              widget.imagePaths[index],
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Container(
+                                  color: Colors.grey[300],
+                                  child: Icon(
+                                    Icons.broken_image,
+                                    size: 48,
+                                    color: Colors.grey[600],
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  )
+                : ListView.builder(
+                    padding: EdgeInsets.all(16),
+                    itemCount: widget.imagePaths.length,
+                    itemBuilder: (context, index) {
+                      return GestureDetector(
+                        onTap: () => _openImageViewer(index),
+                        child: Card(
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          elevation: 4,
+                          margin: EdgeInsets.only(bottom: 16),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(16),
+                            child: Image.asset(
+                              widget.imagePaths[index],
+                              fit: BoxFit.cover,
+                              height: 180,
+                              width: double.infinity,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Container(
+                                  height: 180,
+                                  color: Colors.grey[300],
+                                  child: Icon(
+                                    Icons.broken_image,
+                                    size: 48,
+                                    color: Colors.grey[600],
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
       ),
     );
   }

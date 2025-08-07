@@ -186,12 +186,16 @@ class MemorialDetailScreen extends StatelessWidget {
             'Images',
             Icons.photo_library,
             Colors.blue,
-            () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => ImagesPage(),
-              ),
-            ),
+            () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ImagesPage(
+                    imagePaths: [memorial.imagePath],
+                  ),
+                ),
+              );
+            },
           ),
         if (memorial.videoPath.isNotEmpty)
           _buildContentCard(
@@ -202,7 +206,9 @@ class MemorialDetailScreen extends StatelessWidget {
             () => Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => VideosPage(),
+                builder: (context) => VideosPage(
+                  videoPaths: [memorial.videoPath],
+                ),
               ),
             ),
           ),
@@ -215,7 +221,9 @@ class MemorialDetailScreen extends StatelessWidget {
             () => Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => AudioPage(),
+                builder: (context) => AudioPage(
+                  audioPaths: memorial.audioPaths,
+                ),
               ),
             ),
           ),
@@ -225,12 +233,16 @@ class MemorialDetailScreen extends StatelessWidget {
             'Stories',
             Icons.book,
             Colors.green,
-            () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => StoriesPage(),
-              ),
-            ),
+            () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => StoriesPage(
+                    stories: memorial.stories,
+                  ),
+                ),
+              );
+            },
           ),
         if (memorial.hologramPath.isNotEmpty)
           _buildContentCard(

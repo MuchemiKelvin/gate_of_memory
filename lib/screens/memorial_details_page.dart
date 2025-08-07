@@ -3,6 +3,7 @@ import 'images_page.dart';
 import 'videos_page.dart';
 import 'audio_page.dart';
 import 'stories_page.dart';
+import '../models/memorial.dart';
 
 class MemorialDetailsPage extends StatelessWidget {
   static const double cardWidth = 350;
@@ -120,7 +121,11 @@ class MemorialDetailsPage extends StatelessWidget {
                                 onTap: () {
                                   Navigator.push(
                                     context,
-                                    MaterialPageRoute(builder: (_) => ImagesPage()),
+                                    MaterialPageRoute(
+                                      builder: (_) => ImagesPage(
+                                        imagePaths: ['assets/images/memorial_card.jpeg'],
+                                      ),
+                                    ),
                                   );
                                   _showSnackBar(context, 'Images');
                                 },
@@ -137,7 +142,11 @@ class MemorialDetailsPage extends StatelessWidget {
                                 onTap: () {
                                   Navigator.push(
                                     context,
-                                    MaterialPageRoute(builder: (_) => VideosPage()),
+                                    MaterialPageRoute(
+                                      builder: (_) => VideosPage(
+                                        videoPaths: ['assets/video/memorial_video.mp4'],
+                                      ),
+                                    ),
                                   );
                                   _showSnackBar(context, 'Videos');
                                 },
@@ -158,7 +167,11 @@ class MemorialDetailsPage extends StatelessWidget {
                                 onTap: () {
                                   Navigator.push(
                                     context,
-                                    MaterialPageRoute(builder: (_) => AudioPage()),
+                                    MaterialPageRoute(
+                                      builder: (_) => AudioPage(
+                                        audioPaths: ['assets/audio/victory_chime.mp3'],
+                                      ),
+                                    ),
                                   );
                                   _showSnackBar(context, 'Audio');
                                 },
@@ -175,7 +188,17 @@ class MemorialDetailsPage extends StatelessWidget {
                                 onTap: () {
                                   Navigator.push(
                                     context,
-                                    MaterialPageRoute(builder: (_) => StoriesPage()),
+                                    MaterialPageRoute(
+                                      builder: (_) => StoriesPage(
+                                        stories: [
+                                          Story(
+                                            title: 'A Beautiful Memory',
+                                            snippet: 'It was a sunny day when we all gathered...',
+                                            fullText: 'It was a sunny day when we all gathered at the park. Naomi smiled as she watched the children play, her laughter echoing in the air. We shared stories, food, and love, making memories that would last forever.',
+                                          ),
+                                        ],
+                                      ),
+                                    ),
                                   );
                                 },
                                 child: MediaCard(icon: Icons.menu_book, label: 'Stories'),
