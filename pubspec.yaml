@@ -42,6 +42,9 @@ dependencies:
   geocoding: ^4.0.0
   device_info_plus: ^11.5.0
   http: ^1.1.0
+  sqflite: ^2.3.0
+  sqflite_common_ffi: ^2.3.2
+  path: ^1.8.3
   # carrier_info: removed
 
 dev_dependencies:
@@ -69,8 +72,22 @@ flutter:
   # To add assets to your application, add an assets section, like this:
   assets:
     - assets/images/memorial_card.jpeg
+    - assets/images/naomi_memorial.jpeg
+    - assets/images/john_memorial.jpeg
+    - assets/images/sarah_memorial.jpeg
     - assets/video/memorial_video.mp4
+    - assets/video/naomi_memorial_video.mp4
+    - assets/video/john_memorial_video.mp4
+    - assets/video/sarah_memorial_video.mp4
     - assets/animation/hologram.mp4
+    - assets/animation/naomi_hologram.mp4
+    - assets/animation/john_hologram.mp4
+    - assets/animation/sarah_hologram.mp4
+    - assets/audio/victory_chime.mp3
+    - assets/audio/the-wreck-12291.mp3
+    - assets/audio/naomi_voice_message.mp3
+    - assets/audio/john_teaching_audio.mp3
+    - assets/audio/sarah_scientific_talk.mp3
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

@@ -69,6 +69,28 @@ class StartScreen extends StatelessWidget {
                 ),
               ),
               SizedBox(height: 16),
+              // Gallery Dashboard button
+              ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.pushNamed(context, '/dashboard');
+                },
+                icon: Icon(Icons.photo_library, size: 24),
+                label: Text(
+                  'Gallery',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: 1),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Color(0xFF4CAF50),
+                  foregroundColor: Colors.white,
+                  elevation: 8,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  padding: EdgeInsets.symmetric(horizontal: 36, vertical: 16),
+                  shadowColor: Color(0xFF4CAF50).withOpacity(0.4),
+                ),
+              ),
+              SizedBox(height: 16),
               // Existing Scan button for GateScreen
               ElevatedButton(
                 onPressed: () {
