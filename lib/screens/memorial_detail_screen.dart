@@ -4,6 +4,7 @@ import 'images_page.dart';
 import 'videos_page.dart';
 import 'audio_page.dart';
 import 'stories_page.dart';
+import 'holograms_page.dart';
 
 class MemorialDetailScreen extends StatelessWidget {
   final Memorial memorial;
@@ -257,9 +258,13 @@ class MemorialDetailScreen extends StatelessWidget {
             Icons.view_in_ar,
             Colors.purple,
             () {
-              // TODO: Implement hologram viewer
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Hologram viewer coming soon!')),
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => HologramsPage(
+                    hologramPaths: [memorial.hologramPath],
+                  ),
+                ),
               );
             },
           ),
