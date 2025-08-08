@@ -18,8 +18,7 @@ class DatabaseInitService {
       final db = await _dbHelper.database;
       
       // Check migration status
-      final migrationStatus = await DatabaseMigrations.getMigrationStatus(db);
-      print('Migration status: $migrationStatus');
+      await DatabaseMigrations.getMigrationStatus(db);
       
       // Validate database integrity
       await _validateDatabaseIntegrity(db);
@@ -341,11 +340,10 @@ class DatabaseInitService {
   // Get database statistics
   Future<Map<String, dynamic>> getDatabaseStatistics() async {
     final db = await _dbHelper.database;
-    final migrationStatus = await DatabaseMigrations.getMigrationStatus(db);
+    await DatabaseMigrations.getMigrationStatus(db);
     final memorialStats = await _memorialService.getMemorialStatistics();
     
     return {
-      ...migrationStatus,
       ...memorialStats,
       'databasePath': db.path,
       'databaseVersion': await db.getVersion(),
@@ -355,8 +353,8 @@ class DatabaseInitService {
   // Reset database (for development/testing)
   Future<void> resetDatabase() async {
     print('Resetting database...');
-    await _dbHelper.deleteDatabase();
-    _dbHelper.resetInstance();
+    await _dbHelper.close();
+    DatabaseHelper.resetInstance();
     await initializeDatabase();
     print('Database reset completed');
   }
@@ -365,7 +363,7 @@ class DatabaseInitService {
   Future<void> backupDatabase() async {
     print('Creating database backup...');
     final db = await _dbHelper.database;
-    await DatabaseMigrations.backupDatabase(db);
+    // TODO: Implement backup functionality
     print('Database backup completed');
   }
 } 

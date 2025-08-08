@@ -105,120 +105,132 @@ class AROverlayControls extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.all(16),
+      padding: EdgeInsets.all(8),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Overlay Controls
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          // Overlay Controls - First Row
+          Wrap(
+            spacing: 4,
+            runSpacing: 4,
+            alignment: WrapAlignment.center,
             children: [
               // Show Marker Detection
-              ElevatedButton.icon(
+              _buildControlButton(
                 onPressed: () {
                   overlayService.showMarkerDetection('test_marker_123');
                 },
-                icon: Icon(Icons.qr_code_scanner),
-                label: Text('Marker'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green,
-                  foregroundColor: Colors.white,
-                ),
+                icon: Icons.qr_code_scanner,
+                label: 'Marker',
+                color: Colors.green,
               ),
               
               // Show Hologram
-              ElevatedButton.icon(
+              _buildControlButton(
                 onPressed: () {
                   overlayService.showHologram('hologram_001');
                 },
-                icon: Icon(Icons.view_in_ar),
-                label: Text('Hologram'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Color(0xFF7bb6e7),
-                  foregroundColor: Colors.white,
-                ),
+                icon: Icons.view_in_ar,
+                label: 'Hologram',
+                color: Color(0xFF7bb6e7),
               ),
               
               // Show Info
-              ElevatedButton.icon(
+              _buildControlButton(
                 onPressed: () {
                   overlayService.showInfo('AR Info Message');
                 },
-                icon: Icon(Icons.info),
-                label: Text('Info'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue,
-                  foregroundColor: Colors.white,
-                ),
+                icon: Icons.info,
+                label: 'Info',
+                color: Colors.blue,
               ),
             ],
           ),
           
-          SizedBox(height: 8),
+          SizedBox(height: 4),
           
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          // Second Row
+          Wrap(
+            spacing: 4,
+            runSpacing: 4,
+            alignment: WrapAlignment.center,
             children: [
               // Show Loading
-              ElevatedButton.icon(
+              _buildControlButton(
                 onPressed: () {
                   overlayService.showLoading('Loading AR content...');
                 },
-                icon: Icon(Icons.hourglass_empty),
-                label: Text('Loading'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.orange,
-                  foregroundColor: Colors.white,
-                ),
+                icon: Icons.hourglass_empty,
+                label: 'Loading',
+                color: Colors.orange,
               ),
               
               // Show Error
-              ElevatedButton.icon(
+              _buildControlButton(
                 onPressed: () {
                   overlayService.showError('AR Error occurred');
                 },
-                icon: Icon(Icons.error),
-                label: Text('Error'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red,
-                  foregroundColor: Colors.white,
-                ),
+                icon: Icons.error,
+                label: 'Error',
+                color: Colors.red,
               ),
               
               // Clear All
-              ElevatedButton.icon(
+              _buildControlButton(
                 onPressed: () {
                   overlayService.clearOverlays();
                 },
-                icon: Icon(Icons.clear_all),
-                label: Text('Clear'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.grey,
-                  foregroundColor: Colors.white,
-                ),
+                icon: Icons.clear_all,
+                label: 'Clear',
+                color: Colors.grey,
               ),
             ],
           ),
           
-          SizedBox(height: 8),
+          SizedBox(height: 4),
           
           // Overlay Count
           Container(
-            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
               color: Colors.black.withOpacity(0.7),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
               'Overlays: ${overlayService.visibleOverlays.length}',
               style: TextStyle(
                 color: Colors.white,
-                fontSize: 12,
+                fontSize: 10,
                 fontWeight: FontWeight.bold,
               ),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildControlButton({
+    required VoidCallback onPressed,
+    required IconData icon,
+    required String label,
+    required Color color,
+  }) {
+    return SizedBox(
+      height: 32,
+      child: ElevatedButton.icon(
+        onPressed: onPressed,
+        icon: Icon(icon, size: 16),
+        label: Text(
+          label,
+          style: TextStyle(fontSize: 10),
+        ),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: color,
+          foregroundColor: Colors.white,
+          padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          minimumSize: Size(0, 0),
+        ),
       ),
     );
   }

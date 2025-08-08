@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'gate_screen.dart';
 import 'scan_screen.dart'; // Added import for ScanScreen
+import 'qr_test_screen.dart'; // Added import for QRTestScreen
 
 class StartScreen extends StatelessWidget {
   @override
@@ -23,10 +24,11 @@ class StartScreen extends StatelessWidget {
           ),
         ),
         child: SafeArea(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              SizedBox(height: 32),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+              SizedBox(height: 20),
               Text(
                 'Kardiverse Mobile',
                 style: TextStyle(
@@ -37,13 +39,23 @@ class StartScreen extends StatelessWidget {
                 ),
                 textAlign: TextAlign.center,
               ),
-              SizedBox(height: 32),
+              SizedBox(height: 20),
               QrImageView(
-                data: 'KARDIVERSE-MOBILE-QR',
+                data: 'NAOMI-N-MEMORIAL-001',
                 size: 180,
                 backgroundColor: Colors.white,
               ),
-              SizedBox(height: 32),
+              SizedBox(height: 16),
+              Text(
+                'Test QR Code: NAOMI-N-MEMORIAL-001',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Color(0xFF2d3a4a),
+                  fontWeight: FontWeight.w500,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              SizedBox(height: 16),
               // Modern Scan QR/Barcode button
               ElevatedButton.icon(
                 onPressed: () {
@@ -107,6 +119,26 @@ class StartScreen extends StatelessWidget {
                 ),
               ),
               SizedBox(height: 16),
+              // QR Test Screen button
+              ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => QRTestScreen()),
+                  );
+                },
+                icon: Icon(Icons.qr_code, size: 24),
+                label: Text('QR Test Codes', style: TextStyle(fontSize: 18)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Color(0xFFFF6B35),
+                  foregroundColor: Colors.white,
+                  padding: EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+              SizedBox(height: 16),
               // Existing Scan button for GateScreen
               ElevatedButton(
                 onPressed: () {
@@ -130,7 +162,7 @@ class StartScreen extends StatelessWidget {
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: 1),
                 ),
               ),
-              SizedBox(height: 32),
+              SizedBox(height: 20),
               Text(
                 'Enter the digital sanctuary....',
                 style: TextStyle(
@@ -139,8 +171,10 @@ class StartScreen extends StatelessWidget {
                 ),
                 textAlign: TextAlign.center,
               ),
+              SizedBox(height: 20),
             ],
           ),
+        ),
         ),
       ),
     );

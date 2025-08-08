@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'ar_camera_service.dart';
 import 'ar_overlay_service.dart';
+import 'ar_marker_detection_service.dart';
+import 'ar_content_loading_service.dart';
+import 'dart:async';
 
 enum ARSessionState {
   initializing,
@@ -18,6 +21,8 @@ class ARSessionManager {
 
   final ARCameraService _cameraService = ARCameraService();
   final AROverlayService _overlayService = AROverlayService();
+  final ARMarkerDetectionService _markerDetectionService = ARMarkerDetectionService();
+  final ARContentLoadingService _contentLoadingService = ARContentLoadingService();
   
   ARSessionState _sessionState = ARSessionState.initializing;
   bool _isARSupported = false;
@@ -27,6 +32,14 @@ class ARSessionManager {
   bool _isMarkerDetected = false;
   String _currentMarkerId = '';
   Map<String, dynamic> _arContent = {};
+  ARContent? _currentARContent;
+  
+  // Session management
+  StreamSubscription<ARMarkerDetection>? _markerDetectionSubscription;
+  StreamSubscription<Map<String, dynamic>>? _frameDataSubscription;
+  Timer? _sessionTimer;
+  DateTime? _sessionStartTime;
+  int _sessionDuration = 0;
 
   // Getters
   ARSessionState get sessionState => _sessionState;
@@ -35,7 +48,11 @@ class ARSessionManager {
   bool get isMarkerDetected => _isMarkerDetected;
   String get currentMarkerId => _currentMarkerId;
   Map<String, dynamic> get arContent => _arContent;
+  ARContent? get currentARContent => _currentARContent;
   AROverlayService get overlayService => _overlayService;
+  ARMarkerDetectionService get markerDetectionService => _markerDetectionService;
+  ARContentLoadingService get contentLoadingService => _contentLoadingService;
+  int get sessionDuration => _sessionDuration;
 
   /// Initialize AR session
   Future<bool> initialize() async {
@@ -57,6 +74,12 @@ class ARSessionManager {
         return false;
       }
 
+      // Initialize marker detection service
+      await _initializeMarkerDetection();
+
+      // Preload common content
+      await _preloadCommonContent();
+
       // Show initialization overlay
       _overlayService.showInfo('AR Session Initialized');
 
@@ -66,6 +89,49 @@ class ARSessionManager {
     } catch (e) {
       _setError('Error initializing AR session: $e');
       return false;
+    }
+  }
+
+  /// Initialize marker detection
+  Future<void> _initializeMarkerDetection() async {
+    try {
+      // Subscribe to marker detection events
+      _markerDetectionSubscription = _markerDetectionService.detectionStream.listen(
+        _onMarkerDetected,
+        onError: (error) {
+          print('Marker detection error: $error');
+          _overlayService.showError('Marker detection error: $error');
+        },
+      );
+
+      // Subscribe to camera frame data
+      _frameDataSubscription = _cameraService.frameDataStream.listen(
+        _onFrameDataReceived,
+        onError: (error) {
+          print('Frame data error: $error');
+        },
+      );
+
+      print('Marker detection initialized');
+    } catch (e) {
+      print('Error initializing marker detection: $e');
+    }
+  }
+
+  /// Preload common content
+  Future<void> _preloadCommonContent() async {
+    try {
+      print('Preloading common AR content...');
+      
+      // Get known markers and preload their content
+      final knownMarkers = _markerDetectionService.getKnownMarkers();
+      final markerIds = knownMarkers.keys.toList();
+      
+      await _contentLoadingService.preloadContent(markerIds);
+      
+      print('Common content preloaded');
+    } catch (e) {
+      print('Error preloading content: $e');
     }
   }
 
@@ -79,9 +145,16 @@ class ARSessionManager {
 
       print('Starting AR session...');
       _setSessionState(ARSessionState.active);
+      _sessionStartTime = DateTime.now();
 
       // Start camera preview
       await _cameraService.startPreview();
+      
+      // Start marker detection
+      await _markerDetectionService.startDetection();
+      
+      // Start session timer
+      _startSessionTimer();
       
       // Show session start overlay
       _overlayService.showInfo('AR Session Started');
@@ -104,6 +177,12 @@ class ARSessionManager {
         // Stop camera preview
         await _cameraService.stopPreview();
         
+        // Stop marker detection
+        await _markerDetectionService.stopDetection();
+        
+        // Stop session timer
+        _stopSessionTimer();
+        
         // Show pause overlay
         _overlayService.showInfo('AR Session Paused');
         
@@ -123,6 +202,12 @@ class ARSessionManager {
         
         // Restart camera preview
         await _cameraService.startPreview();
+        
+        // Restart marker detection
+        await _markerDetectionService.startDetection();
+        
+        // Restart session timer
+        _startSessionTimer();
         
         // Show resume overlay
         _overlayService.showInfo('AR Session Resumed');
@@ -145,6 +230,12 @@ class ARSessionManager {
       // Stop camera preview
       await _cameraService.stopPreview();
       
+      // Stop marker detection
+      await _markerDetectionService.stopDetection();
+      
+      // Stop session timer
+      _stopSessionTimer();
+      
       // Clear overlays
       _overlayService.clearOverlays();
       
@@ -152,11 +243,58 @@ class ARSessionManager {
       _isMarkerDetected = false;
       _currentMarkerId = '';
       _arContent.clear();
+      _currentARContent = null;
       
       _setSessionState(ARSessionState.ready);
       print('AR session stopped');
     } catch (e) {
       print('Error stopping AR session: $e');
+    }
+  }
+
+  /// Start session timer
+  void _startSessionTimer() {
+    _sessionTimer?.cancel();
+    _sessionTimer = Timer.periodic(Duration(seconds: 1), (timer) {
+      if (_sessionState == ARSessionState.active) {
+        _sessionDuration++;
+      }
+    });
+  }
+
+  /// Stop session timer
+  void _stopSessionTimer() {
+    _sessionTimer?.cancel();
+    _sessionTimer = null;
+  }
+
+  /// Handle marker detection events
+  void _onMarkerDetected(ARMarkerDetection detection) {
+    try {
+      print('Marker detected in session: ${detection.markerId}');
+      
+      _isMarkerDetected = true;
+      _currentMarkerId = detection.markerId;
+      _arContent = detection.markerData;
+      
+      // Show marker detection overlay
+      _overlayService.showMarkerDetection(detection.markerId);
+      
+      // Load AR content for the detected marker
+      _loadARContent(detection.markerId, detection.markerData);
+      
+    } catch (e) {
+      print('Error handling marker detection: $e');
+    }
+  }
+
+  /// Handle camera frame data
+  void _onFrameDataReceived(Map<String, dynamic> frameData) {
+    // Process frame data for AR marker detection
+    // This is where we would integrate with the marker detection service
+    if (_sessionState == ARSessionState.active) {
+      // Frame data processing for AR
+      // print('Processing frame data: ${frameData['timestamp']}');
     }
   }
 
@@ -172,7 +310,7 @@ class ARSessionManager {
       // Show marker detection overlay
       _overlayService.showMarkerDetection(markerId);
       
-      // Trigger AR content loading
+      // Load AR content for the detected marker
       _loadARContent(markerId, markerData);
       
     } catch (e) {
@@ -188,23 +326,32 @@ class ARSessionManager {
       // Show loading overlay
       _overlayService.showLoading('Loading hologram content...');
       
-      // Simulate loading delay
-      await Future.delayed(Duration(seconds: 2));
+      // Load content using content loading service
+      final content = await _contentLoadingService.loadContent(markerId, markerData);
       
-      // Clear loading overlay
-      _overlayService.clearOverlaysByType(AROverlayType.loading);
-      
-      // Show hologram overlay
-      _overlayService.showHologram('hologram_$markerId');
-      
-      // TODO: Load actual hologram content based on marker data
-      // This will be enhanced in Task 17: Implement AR Content Loading
-      
-      // For now, just log the marker data
-      print('Marker data: $markerData');
+      if (content != null) {
+        _currentARContent = content;
+        
+        // Clear loading overlay
+        _overlayService.clearOverlaysByType(AROverlayType.loading);
+        
+        // Show hologram overlay with content info
+        _overlayService.showHologram('hologram_$markerId');
+        
+        // Show content info overlay
+        _overlayService.showInfo('${content.title} loaded successfully');
+        
+        print('AR content loaded: ${content.title}');
+      } else {
+        // Show error overlay
+        _overlayService.clearOverlaysByType(AROverlayType.loading);
+        _overlayService.showError('Failed to load AR content for marker: $markerId');
+        print('Failed to load AR content for marker: $markerId');
+      }
       
     } catch (e) {
       print('Error loading AR content: $e');
+      _overlayService.clearOverlaysByType(AROverlayType.loading);
       _overlayService.showError('Failed to load AR content: $e');
     }
   }
@@ -214,6 +361,7 @@ class ARSessionManager {
     _isMarkerDetected = false;
     _currentMarkerId = '';
     _arContent.clear();
+    _currentARContent = null;
     
     // Clear marker overlays
     _overlayService.clearOverlaysByType(AROverlayType.marker);
@@ -256,6 +404,21 @@ class ARSessionManager {
     return _cameraService.getCameraStatus();
   }
 
+  /// Get session statistics
+  Map<String, dynamic> getSessionStats() {
+    return {
+      'sessionState': _sessionState.toString(),
+      'sessionDuration': _sessionDuration,
+      'isMarkerDetected': _isMarkerDetected,
+      'currentMarkerId': _currentMarkerId,
+      'currentARContent': _currentARContent?.title,
+      'cameraStatus': _cameraService.getCameraStatus(),
+      'markerDetectionStats': _markerDetectionService.getDetectionStats(),
+      'contentLoadingStats': _contentLoadingService.getLoadingStatus(),
+      'overlayCount': _overlayService.visibleOverlays.length,
+    };
+  }
+
   /// Set session state
   void _setSessionState(ARSessionState state) {
     _sessionState = state;
@@ -283,8 +446,21 @@ class ARSessionManager {
     try {
       print('Disposing AR session...');
       
+      // Stop session timer
+      _stopSessionTimer();
+      
+      // Cancel subscriptions
+      _markerDetectionSubscription?.cancel();
+      _frameDataSubscription?.cancel();
+      
       // Stop camera service
       await _cameraService.dispose();
+      
+      // Dispose marker detection service
+      _markerDetectionService.dispose();
+      
+      // Dispose content loading service
+      _contentLoadingService.dispose();
       
       // Dispose overlay service
       _overlayService.dispose();
@@ -293,6 +469,7 @@ class ARSessionManager {
       _isMarkerDetected = false;
       _currentMarkerId = '';
       _arContent.clear();
+      _currentARContent = null;
       
       _setSessionState(ARSessionState.disposed);
       print('AR session disposed');

@@ -7,6 +7,7 @@ import 'screens/location_settings_screen.dart';
 import 'screens/location_debug_screen.dart';
 import 'screens/geo_blocker.dart';
 import 'screens/ar_camera_screen.dart';
+import 'services/database_init_service.dart';
 
 // Conditional import for desktop platforms only
 import 'database_initializer.dart' if (dart.library.html) 'database_initializer_web.dart';
@@ -16,6 +17,17 @@ void main() async {
   
   // Initialize database based on platform
   await initializeDatabase();
+  
+  // Test database initialization
+  try {
+    print('=== TESTING DATABASE INITIALIZATION ===');
+    final dbInitService = DatabaseInitService();
+    final stats = await dbInitService.getDatabaseStatistics();
+    print('Database statistics: $stats');
+    print('=== END DATABASE TEST ===');
+  } catch (e) {
+    print('Database test error: $e');
+  }
   
   runApp(
     MaterialApp(

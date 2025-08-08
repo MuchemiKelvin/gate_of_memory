@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
-import '../services/ar_session_manager.dart';
+import 'package:camera/camera.dart';
+import '../services/real_ar_session_manager.dart';
 import '../widgets/ar_overlay_widget.dart';
+import '../services/database_init_service.dart';
 
 class ARCameraScreen extends StatefulWidget {
   const ARCameraScreen({super.key});
@@ -10,42 +12,52 @@ class ARCameraScreen extends StatefulWidget {
 }
 
 class _ARCameraScreenState extends State<ARCameraScreen> {
-  final ARSessionManager _arSessionManager = ARSessionManager();
+  final RealARSessionManager _realARSessionManager = RealARSessionManager();
+  
   bool _isInitialized = false;
-  String _statusMessage = 'Initializing AR...';
+  String _statusMessage = 'Initializing Real AR...';
   bool _showOverlayControls = false;
+  bool _showCameraControls = false;
+  bool _showContentInfo = false;
+  bool _cameraInitialized = false;
 
   @override
   void initState() {
     super.initState();
-    _initializeAR();
+    _initializeRealAR();
   }
 
-  Future<void> _initializeAR() async {
+  Future<void> _initializeRealAR() async {
     try {
-      print('Initializing AR camera screen...');
+      print('Initializing REAL AR system...');
+      setState(() {
+        _statusMessage = 'Initializing Real AR...';
+      });
       
-      final success = await _arSessionManager.initialize();
-      if (success) {
+      // Initialize real AR session
+      final success = await _realARSessionManager.initialize();
+      if (!success) {
         setState(() {
-          _isInitialized = true;
-          _statusMessage = _arSessionManager.getSessionStatus();
+          _statusMessage = 'Failed to initialize Real AR: ${_realARSessionManager.errorMessage}';
         });
-        
-        // Start AR session
-        await _arSessionManager.startSession();
-        setState(() {
-          _statusMessage = _arSessionManager.getSessionStatus();
-        });
-        
-        print('AR camera screen initialized successfully');
-      } else {
-        setState(() {
-          _statusMessage = 'Failed to initialize AR: ${_arSessionManager.errorMessage}';
-        });
+        return;
       }
+      
+      // Test database connection
+      await _realARSessionManager.contentLoadingService.testDatabaseConnection();
+      
+      // Start real AR session
+      await _realARSessionManager.startSession();
+      
+      setState(() {
+        _isInitialized = true;
+        _cameraInitialized = true;
+        _statusMessage = 'Real AR Active - Point camera at QR marker';
+      });
+      
+      print('Real AR system initialized successfully');
     } catch (e) {
-      print('Error initializing AR camera screen: $e');
+      print('Error initializing real AR: $e');
       setState(() {
         _statusMessage = 'Error: $e';
       });
@@ -54,8 +66,72 @@ class _ARCameraScreenState extends State<ARCameraScreen> {
 
   @override
   void dispose() {
-    _arSessionManager.dispose();
+    _realARSessionManager.dispose();
     super.dispose();
+  }
+
+  void _switchCamera() {
+    _realARSessionManager.cameraService.switchCamera();
+    setState(() {});
+  }
+
+  void _takePhoto() async {
+    await _realARSessionManager.cameraService.takePhoto();
+  }
+
+  void _toggleOverlayControls() {
+    setState(() {
+      _showOverlayControls = !_showOverlayControls;
+    });
+  }
+
+  void _toggleCameraControls() {
+    setState(() {
+      _showCameraControls = !_showCameraControls;
+    });
+  }
+
+  void _showARSettings() {
+    // Show AR settings dialog
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('AR Settings'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              title: Text('Marker Detection'),
+              subtitle: Text(_realARSessionManager.isMarkerDetected ? 'Active' : 'Inactive'),
+            ),
+            ListTile(
+              title: Text('Session State'),
+              subtitle: Text(_realARSessionManager.sessionState.toString().split('.').last),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _toggleARSession() {
+    if (_realARSessionManager.sessionState == RealARSessionState.active) {
+      _realARSessionManager.pauseSession();
+    } else {
+      _realARSessionManager.resumeSession();
+    }
+    setState(() {});
+  }
+
+  void _testQRDetection() {
+    _realARSessionManager.qrDetectionService.triggerTestDetection();
+    setState(() {});
   }
 
   @override
@@ -89,306 +165,214 @@ class _ARCameraScreenState extends State<ARCameraScreen> {
             onPressed: _toggleOverlayControls,
             tooltip: 'Overlay Controls',
           ),
+          IconButton(
+            icon: Icon(Icons.settings, color: Colors.white),
+            onPressed: _showARSettings,
+            tooltip: 'AR Settings',
+          ),
+          IconButton(
+            icon: Icon(Icons.qr_code, color: Colors.white),
+            onPressed: _testQRDetection,
+            tooltip: 'Test QR Detection',
+          ),
         ],
       ),
-      body: AROverlayContainer(
-        overlayService: _arSessionManager.overlayService,
-        child: Stack(
-          children: [
-            // Camera Preview (Simulated)
-            Container(
-              color: Colors.black,
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    // Simulated Camera View
-                    Container(
-                      width: 300,
-                      height: 400,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[900],
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: Color(0xFF7bb6e7), width: 2),
-                      ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.camera_alt,
-                            size: 80,
-                            color: Colors.white54,
-                          ),
-                          SizedBox(height: 20),
-                          Text(
-                            'Simulated Camera',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          SizedBox(height: 10),
-                          Text(
-                            _arSessionManager.getCameraStatus(),
-                            style: TextStyle(
-                              color: Colors.grey[400],
-                              fontSize: 14,
-                            ),
-                          ),
-                          SizedBox(height: 20),
-                          if (!_isInitialized)
-                            CircularProgressIndicator(
-                              color: Color(0xFF7bb6e7),
-                            ),
-                        ],
-                      ),
+      body: Stack(
+        children: [
+          // Camera Preview
+          Container(
+            width: double.infinity,
+            height: double.infinity,
+            child: _cameraInitialized
+                ? _buildCameraPreview()
+                : _buildCameraLoadingView(),
+          ),
+          
+          // AR Status Overlay
+          Positioned(
+            top: 20,
+            left: 20,
+            right: 20,
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.7),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                _statusMessage,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+          
+          // AR Controls
+          Positioned(
+            bottom: 40,
+            left: 0,
+            right: 0,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                // Pause/Resume Button
+                FloatingActionButton(
+                  heroTag: 'ar_pause_resume',
+                  onPressed: _toggleARSession,
+                  backgroundColor: Color(0xFF7bb6e7),
+                  child: Icon(
+                    _realARSessionManager.sessionState == RealARSessionState.active
+                        ? Icons.pause
+                        : Icons.play_arrow,
+                    color: Colors.white,
+                  ),
+                ),
+                
+                // Marker Detection Status
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: _realARSessionManager.isMarkerDetected
+                        ? Colors.green.withOpacity(0.8)
+                        : Colors.orange.withOpacity(0.8),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    _realARSessionManager.isMarkerDetected
+                        ? 'Marker Detected'
+                        : 'Scanning...',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
                     ),
-                    SizedBox(height: 30),
+                  ),
+                ),
+                
+                // Camera Controls Toggle
+                FloatingActionButton(
+                  heroTag: 'ar_camera_controls',
+                  onPressed: _toggleCameraControls,
+                  backgroundColor: Colors.white24,
+                  child: Icon(
+                    Icons.camera_alt,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          
+          // AR Instructions
+          if (!_realARSessionManager.isMarkerDetected)
+            Positioned(
+              top: 100,
+              left: 20,
+              right: 20,
+              child: Container(
+                padding: EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.7),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  children: [
                     Text(
-                      _statusMessage,
+                      'Point camera at QR marker',
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 16,
+                        fontWeight: FontWeight.bold,
                       ),
-                      textAlign: TextAlign.center,
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      'Hold steady to detect marker',
+                      style: TextStyle(
+                        color: Colors.grey[300],
+                        fontSize: 14,
+                      ),
                     ),
                   ],
                 ),
               ),
             ),
-            
-            // AR Status Overlay
-            Positioned(
-              top: 20,
-              left: 20,
-              right: 20,
-              child: Container(
-                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.7),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  _statusMessage,
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            ),
-            
-            // AR Controls
-            Positioned(
-              bottom: 40,
-              left: 0,
-              right: 0,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  // Pause/Resume Button
-                  FloatingActionButton(
-                    heroTag: 'ar_pause_resume',
-                    onPressed: _toggleARSession,
-                    backgroundColor: Color(0xFF7bb6e7),
-                    child: Icon(
-                      _arSessionManager.sessionState == ARSessionState.active
-                          ? Icons.pause
-                          : Icons.play_arrow,
-                      color: Colors.white,
-                    ),
-                  ),
-                  
-                  // Marker Detection Status
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: _arSessionManager.isMarkerDetected
-                          ? Colors.green.withOpacity(0.8)
-                          : Colors.orange.withOpacity(0.8),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      _arSessionManager.isMarkerDetected
-                          ? 'Marker Detected'
-                          : 'Scanning...',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  
-                  // Settings Button
-                  FloatingActionButton(
-                    heroTag: 'ar_settings',
-                    onPressed: _showARSettings,
-                    backgroundColor: Colors.white24,
-                    child: Icon(
-                      Icons.settings,
-                      color: Colors.white,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            
-            // AR Instructions
-            if (!_arSessionManager.isMarkerDetected)
-              Positioned(
-                top: 100,
-                left: 20,
-                right: 20,
-                child: Container(
-                  padding: EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.7),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Column(
-                    children: [
-                      Icon(
-                        Icons.qr_code_scanner,
-                        color: Color(0xFF7bb6e7),
-                        size: 32,
-                      ),
-                      SizedBox(height: 8),
-                      Text(
-                        'Point camera at a QR marker to view holograms in AR',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      SizedBox(height: 8),
-                      Text(
-                        '(Simulated for emulator testing)',
-                        style: TextStyle(
-                          color: Colors.grey[400],
-                          fontSize: 12,
-                          fontStyle: FontStyle.italic,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            
-            // Overlay Controls Panel
-            if (_showOverlayControls)
-              Positioned(
-                top: 100,
-                left: 20,
-                right: 20,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.9),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Color(0xFF7bb6e7), width: 2),
-                  ),
-                  child: AROverlayControls(
-                    overlayService: _arSessionManager.overlayService,
-                  ),
-                ),
-              ),
-          ],
-        ),
+        ],
       ),
     );
   }
 
-  Future<void> _switchCamera() async {
-    try {
-      await _arSessionManager.switchCamera();
-      setState(() {
-        _statusMessage = 'Camera switched';
-      });
-    } catch (e) {
-      print('Error switching camera: $e');
-    }
-  }
-
-  Future<void> _takePhoto() async {
-    try {
-      final photoPath = await _arSessionManager.takeARPhoto();
-      if (photoPath != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Photo saved: $photoPath')),
-        );
-      }
-    } catch (e) {
-      print('Error taking photo: $e');
-    }
-  }
-
-  Future<void> _toggleARSession() async {
-    try {
-      if (_arSessionManager.sessionState == ARSessionState.active) {
-        await _arSessionManager.pauseSession();
-      } else if (_arSessionManager.sessionState == ARSessionState.paused) {
-        await _arSessionManager.resumeSession();
-      }
-      setState(() {
-        _statusMessage = _arSessionManager.getSessionStatus();
-      });
-    } catch (e) {
-      print('Error toggling AR session: $e');
-    }
-  }
-
-  void _toggleOverlayControls() {
-    setState(() {
-      _showOverlayControls = !_showOverlayControls;
-    });
-  }
-
-  void _showARSettings() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('AR Settings'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              title: Text('AR Session State'),
-              subtitle: Text(_arSessionManager.sessionState.toString()),
-            ),
-            ListTile(
-              title: Text('Camera Status'),
-              subtitle: Text(_arSessionManager.getCameraStatus()),
-            ),
-            ListTile(
-              title: Text('Marker Detected'),
-              subtitle: Text(_arSessionManager.isMarkerDetected ? 'Yes' : 'No'),
-            ),
-            if (_arSessionManager.isMarkerDetected)
-              ListTile(
-                title: Text('Current Marker'),
-                subtitle: Text(_arSessionManager.currentMarkerId),
+  Widget _buildCameraPreview() {
+    final cameraController = _realARSessionManager.cameraService.cameraController;
+    
+    if (cameraController == null || !cameraController.value.isInitialized) {
+      return Container(
+        width: double.infinity,
+        height: double.infinity,
+        color: Colors.black,
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.camera_alt,
+                color: Colors.white,
+                size: 64,
               ),
-            ListTile(
-              title: Text('AR Supported'),
-              subtitle: Text(_arSessionManager.isARSupported ? 'Yes' : 'No'),
+              SizedBox(height: 16),
+              Text(
+                'Camera Ready',
+                style: TextStyle(color: Colors.white, fontSize: 18),
+              ),
+              SizedBox(height: 8),
+              Text(
+                'Point at QR code to scan',
+                style: TextStyle(color: Colors.grey[400], fontSize: 14),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return CameraPreview(cameraController);
+  }
+
+  Widget _buildCameraLoadingView() {
+    return Container(
+      width: double.infinity,
+      height: double.infinity,
+      color: Colors.black,
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(
+              color: Color(0xFF7bb6e7),
             ),
-            ListTile(
-              title: Text('Active Overlays'),
-              subtitle: Text('${_arSessionManager.overlayService.visibleOverlays.length}'),
+            SizedBox(height: 16),
+            Text(
+              'Initializing Real Camera...',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            SizedBox(height: 8),
+            Text(
+              'Please grant camera permission',
+              style: TextStyle(
+                color: Colors.grey[400],
+                fontSize: 14,
+              ),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Close'),
-          ),
-        ],
       ),
     );
   }
