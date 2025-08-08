@@ -202,8 +202,9 @@ class RealQRDetectionService {
 
   /// Dispose QR detection service
   void dispose() {
-    _detectionController.close();
-    _statusController.close();
+    // Don't close stream controllers for singleton pattern
+    // _detectionController.close();
+    // _statusController.close();
     print('Real QR detection service disposed');
   }
 } 

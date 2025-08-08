@@ -5,6 +5,7 @@ import 'real_qr_detection_service.dart';
 import 'real_hologram_service.dart';
 import 'ar_content_loading_service.dart';
 import 'ar_overlay_service.dart';
+import 'qr_code_service.dart';
 import 'dart:async';
 
 enum RealARSessionState {
@@ -26,6 +27,7 @@ class RealARSessionManager {
   final RealHologramService _hologramService = RealHologramService();
   final ARContentLoadingService _contentLoadingService = ARContentLoadingService();
   final AROverlayService _overlayService = AROverlayService();
+  final QRCodeService _qrCodeService = QRCodeService();
 
   // Session state
   RealARSessionState _sessionState = RealARSessionState.initializing;
@@ -36,9 +38,9 @@ class RealARSessionManager {
   
   // Content state tracking
   String? _currentlyLoadedContent;
+  bool _isLoadingHologram = false;
 
   // Stream subscriptions
-  StreamSubscription? _cameraFrameSubscription;
   StreamSubscription? _qrDetectionSubscription;
   StreamSubscription? _hologramSubscription;
 
@@ -52,6 +54,7 @@ class RealARSessionManager {
   RealHologramService get hologramService => _hologramService;
   ARContentLoadingService get contentLoadingService => _contentLoadingService;
   AROverlayService get overlayService => _overlayService;
+  QRCodeService get qrCodeService => _qrCodeService;
 
   bool get isInitialized => _sessionState != RealARSessionState.initializing;
   bool get isActive => _sessionState == RealARSessionState.active;
@@ -106,18 +109,10 @@ class RealARSessionManager {
 
   /// Set up stream subscriptions for real-time processing
   void _setupStreamSubscriptions() {
-    // Subscribe to camera frames for QR detection
-    _cameraFrameSubscription = _cameraService.frameDataStream.listen((frameData) {
-      if (_sessionState == RealARSessionState.active) {
-        // Process camera frame for QR detection
-        _processCameraFrame(frameData);
-      }
-    });
-
     // Subscribe to QR detection results
     _qrDetectionSubscription = _qrDetectionService.detectionStream.listen((detectionData) {
       if (_sessionState == RealARSessionState.active) {
-        _onQRDetected(detectionData);
+        onQRDetected(detectionData);
       }
     });
 
@@ -179,52 +174,10 @@ class RealARSessionManager {
     }
   }
 
-  /// Process camera frame for QR detection
-  void _processCameraFrame(Map<String, dynamic> frameData) {
-    // Process camera frame for QR detection
-    if (_qrDetectionService.isDetecting) {
-      // Trigger QR detection processing
-      // Since we don't have the actual CameraImage object here,
-      // we'll use a more direct approach to trigger detection
-      _triggerQRDetection();
-    }
-  }
 
-  /// Trigger QR detection processing
-  void _triggerQRDetection() {
-    // Only trigger detection once per session
-    if (_currentlyLoadedContent != null) {
-      return; // Content already loaded, don't detect again
-    }
-    
-    // Focus on only Naomi N. memorial for testing
-    final targetQRCode = 'NAOMI-N-MEMORIAL-001';
-    
-    // Simulate detection with very low frequency
-    final random = DateTime.now().millisecondsSinceEpoch % 1000;
-    if (random < 1) { // 0.1% chance of detection per frame (very rare)
-      final confidence = 0.95; // High confidence
-      
-      // Simulate detection result
-      final detectionData = {
-        'qrCode': targetQRCode,
-        'confidence': confidence,
-        'timestamp': DateTime.now().millisecondsSinceEpoch,
-        'position': {
-          'x': 0.5,
-          'y': 0.5,
-          'width': 0.2,
-          'height': 0.2,
-        },
-      };
-      
-      // Trigger the detection callback
-      _onQRDetected(detectionData);
-    }
-  }
 
-  /// Handle QR code detection
-  void _onQRDetected(Map<String, dynamic> detectionData) {
+  /// Handle QR code detection with real validation
+  Future<void> onQRDetected(Map<String, dynamic> detectionData) async {
     final qrCode = detectionData['qrCode'] as String?;
     final confidence = detectionData['confidence'] as double?;
     
@@ -237,17 +190,28 @@ class RealARSessionManager {
       
       print('Real QR detected: $qrCode (${(confidence * 100).toStringAsFixed(1)}%)');
       
-      _currentMarkerId = qrCode;
-      _overlayService.showMarkerDetection(qrCode);
+      // Validate QR code against database
+      final memorial = await _qrCodeService.validateQRCode(qrCode);
       
-      // Load AR content for the detected marker
-      _loadARContentForMarker(qrCode);
+      if (memorial != null) {
+        // Valid memorial found
+        _currentMarkerId = qrCode;
+        _overlayService.showMarkerDetection(qrCode);
+        
+        // Load AR content for the detected marker
+        _loadARContentForMarker(qrCode);
+      } else {
+        // Invalid QR code - show error
+        _overlayService.showError(_qrCodeService.getErrorMessage());
+        print('Invalid QR code: ${_qrCodeService.lastError}');
+      }
     }
   }
 
   /// Load AR content for detected marker
   Future<void> _loadARContentForMarker(String markerId) async {
     try {
+      _isLoadingHologram = true;
       _overlayService.showLoading('Loading real AR content...');
       
       // Load content from database
@@ -273,27 +237,35 @@ class RealARSessionManager {
         // Load real hologram
         await _hologramService.loadHologram(markerId, {
           'hologramPath': content.hologramPath,
-          'position': {'x': 0, 'y': 0, 'z': 0},
-          'rotation': {'x': 0, 'y': 0, 'z': 0},
+          'position': {'x': 0.0, 'y': 0.0, 'z': 0.0},
+          'rotation': {'x': 0.0, 'y': 0.0, 'z': 0.0},
           'scale': 1.0,
         });
 
-        // Clear all overlays and show the content
+        // Clear previous overlays and show the new content
         _overlayService.clearOverlays();
-        _overlayService.showHologram('hologram_$markerId');
+        _overlayService.showHologram(markerId);
+        
+        // Add a small delay before showing the info message to prevent interference
+        await Future.delayed(Duration(milliseconds: 100));
+        
+        // Show success message briefly
         _overlayService.showInfo('Real AR content loaded: ${content.title}');
         
         // Mark this content as loaded
         _currentlyLoadedContent = markerId;
+        _isLoadingHologram = false;
         
         print('Real AR content loaded: ${content.title}');
       } else {
         _overlayService.showError('Failed to load real AR content');
         print('Failed to load real AR content for marker: $markerId');
+        _isLoadingHologram = false;
       }
     } catch (e) {
       print('Error loading real AR content: $e');
       _overlayService.showError('Error loading AR content: $e');
+      _isLoadingHologram = false;
     }
   }
 
@@ -306,8 +278,20 @@ class RealARSessionManager {
     
     if (hologramId != null) {
       print('Real hologram updated: $hologramId');
-      // Update overlay with real hologram data
-      _overlayService.showHologram(hologramId);
+      
+      // Don't interfere if we're currently loading a hologram
+      if (_isLoadingHologram) {
+        print('Skipping hologram update - currently loading hologram');
+        return;
+      }
+      
+      // Only update if this is a different hologram or if we need to refresh
+      // Don't interfere with the initial hologram display
+      if (_currentMarkerId != hologramId) {
+        _overlayService.showHologram(hologramId);
+      } else {
+        print('Skipping hologram update for current marker: $hologramId');
+      }
     }
   }
 
@@ -349,7 +333,6 @@ class RealARSessionManager {
 
   /// Dispose real AR session
   void dispose() {
-    _cameraFrameSubscription?.cancel();
     _qrDetectionSubscription?.cancel();
     _hologramSubscription?.cancel();
     

@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
-import 'package:qr_flutter/qr_flutter.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 import '../services/real_ar_session_manager.dart';
+import '../services/qr_code_service.dart';
 import '../widgets/ar_overlay_widget.dart';
 import '../services/database_init_service.dart';
 import 'images_page.dart';
@@ -18,6 +19,7 @@ class ARCameraScreen extends StatefulWidget {
 
 class _ARCameraScreenState extends State<ARCameraScreen> {
   final RealARSessionManager _realARSessionManager = RealARSessionManager();
+  final QRCodeService _qrCodeService = QRCodeService();
   
   bool _isInitialized = false;
   String _statusMessage = 'Initializing Real AR...';
@@ -25,7 +27,6 @@ class _ARCameraScreenState extends State<ARCameraScreen> {
   bool _showCameraControls = false;
   bool _showContentInfo = false;
   bool _cameraInitialized = false;
-  bool _showQRCodePanel = false;
 
   @override
   void initState() {
@@ -98,15 +99,63 @@ class _ARCameraScreenState extends State<ARCameraScreen> {
     });
   }
 
-  void _toggleQRCodePanel() {
-    setState(() {
-      _showQRCodePanel = !_showQRCodePanel;
-    });
-  }
+
   
   /// Setup navigation callback for AR overlays
   void _setupNavigationCallback() {
     _realARSessionManager.overlayService.setNavigationCallback(_navigateToScreen);
+  }
+
+  void _handleRealQRScan(BarcodeCapture capture) {
+    try {
+      final List<Barcode> barcodes = capture.barcodes;
+      
+      if (barcodes.isEmpty) return;
+
+      for (final barcode in barcodes) {
+        final qrCode = barcode.rawValue;
+        
+        if (qrCode != null && qrCode.isNotEmpty) {
+          print('QR Code detected: $qrCode');
+          _processRealQRCode(qrCode);
+          return; // Process only the first valid QR code
+        }
+      }
+    } catch (e) {
+      print('Error in QR scanning: $e');
+    }
+  }
+
+  Future<void> _processRealQRCode(String qrCode) async {
+    try {
+      // Validate QR code against database
+      final memorial = await _qrCodeService.validateQRCode(qrCode);
+      
+      if (memorial != null) {
+        // Valid memorial found - trigger AR content loading through session manager
+        print('Valid memorial found: ${memorial.name}');
+        
+        // Use the AR session manager's QR detection handler
+        await _realARSessionManager.onQRDetected({
+          'qrCode': qrCode,
+          'confidence': 0.9,
+          'timestamp': DateTime.now().millisecondsSinceEpoch,
+          'position': {
+            'x': 0.5,
+            'y': 0.5,
+            'width': 0.2,
+            'height': 0.2,
+          },
+        });
+      } else {
+        // Invalid QR code - show error
+        _realARSessionManager.overlayService.showError(_qrCodeService.getErrorMessage());
+        print('Invalid QR code: ${_qrCodeService.lastError}');
+      }
+    } catch (e) {
+      print('Error processing real QR code: $e');
+      _realARSessionManager.overlayService.showError('Error processing QR code: $e');
+    }
   }
   
   /// Navigate to specific screen with arguments
@@ -225,10 +274,7 @@ class _ARCameraScreenState extends State<ARCameraScreen> {
     setState(() {});
   }
 
-  void _testQRDetection() {
-    _realARSessionManager.qrDetectionService.triggerTestDetection();
-    setState(() {});
-  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -257,19 +303,9 @@ class _ARCameraScreenState extends State<ARCameraScreen> {
             tooltip: 'Take Photo',
           ),
           IconButton(
-            icon: Icon(Icons.layers, color: Colors.white),
-            onPressed: _toggleOverlayControls,
-            tooltip: 'Overlay Controls',
-          ),
-          IconButton(
             icon: Icon(Icons.settings, color: Colors.white),
             onPressed: _showARSettings,
             tooltip: 'AR Settings',
-          ),
-          IconButton(
-            icon: Icon(Icons.qr_code, color: Colors.white),
-            onPressed: _testQRDetection,
-            tooltip: 'Test QR Detection',
           ),
         ],
       ),
@@ -400,66 +436,7 @@ class _ARCameraScreenState extends State<ARCameraScreen> {
               ),
             ),
           
-          // QR Code Panel Toggle Button
-          Positioned(
-            top: 100,
-            right: 20,
-            child: FloatingActionButton(
-              heroTag: 'qr_panel_toggle',
-              onPressed: _toggleQRCodePanel,
-              backgroundColor: Color(0xFF7bb6e7),
-              mini: true,
-              child: Icon(
-                _showQRCodePanel ? Icons.qr_code_scanner : Icons.qr_code,
-                color: Colors.white,
-              ),
-            ),
-          ),
-          
-                     // QR Code Display Panel
-           if (_showQRCodePanel)
-             Positioned(
-               top: 160,
-               right: 20,
-               child: Container(
-                 width: 200,
-                 height: 300, // Fixed height to prevent overflow
-                 padding: EdgeInsets.all(16),
-                 decoration: BoxDecoration(
-                   color: Colors.black.withOpacity(0.8),
-                   borderRadius: BorderRadius.circular(12),
-                   border: Border.all(color: Color(0xFF7bb6e7), width: 2),
-                 ),
-                 child: Column(
-                   mainAxisSize: MainAxisSize.min,
-                   children: [
-                     Text(
-                       'Scan These QR Codes',
-                       style: TextStyle(
-                         color: Colors.white,
-                         fontSize: 14,
-                         fontWeight: FontWeight.bold,
-                       ),
-                     ),
-                     SizedBox(height: 12),
-                     Expanded(
-                       child: SingleChildScrollView(
-                         child: Column(
-                           mainAxisSize: MainAxisSize.min,
-                           children: [
-                             _buildQRCodeItem('NAOMI-N-MEMORIAL-001', 'Naomi N.'),
-                             SizedBox(height: 8),
-                             _buildQRCodeItem('JOHN-M-MEMORIAL-002', 'John M.'),
-                             SizedBox(height: 8),
-                             _buildQRCodeItem('SARAH-K-MEMORIAL-003', 'Sarah K.'),
-                           ],
-                         ),
-                       ),
-                     ),
-                   ],
-                 ),
-               ),
-             ),
+
            ],
          ),
        ),
@@ -499,7 +476,11 @@ class _ARCameraScreenState extends State<ARCameraScreen> {
       );
     }
 
-    return CameraPreview(cameraController);
+    // Use MobileScanner for QR scanning
+    return MobileScanner(
+      onDetect: _handleRealQRScan,
+      controller: MobileScannerController(),
+    );
   }
 
   Widget _buildCameraLoadingView() {
@@ -537,50 +518,5 @@ class _ARCameraScreenState extends State<ARCameraScreen> {
     );
   }
 
-  Widget _buildQRCodeItem(String qrData, String title) {
-    return Container(
-      padding: EdgeInsets.all(6),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: Color(0xFF7bb6e7), width: 1),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            title,
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 10,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          SizedBox(height: 2),
-          Container(
-            width: 50,
-            height: 50,
-            child: QrImageView(
-              data: qrData,
-              size: 50,
-              backgroundColor: Colors.white,
-              version: QrVersions.auto,
-              errorCorrectionLevel: QrErrorCorrectLevel.H,
-            ),
-          ),
-          SizedBox(height: 2),
-          Text(
-            qrData,
-            style: TextStyle(
-              color: Colors.grey[300],
-              fontSize: 7,
-            ),
-            textAlign: TextAlign.center,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
-      ),
-    );
-  }
+
 } 

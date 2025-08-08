@@ -138,7 +138,7 @@ class StartScreen extends StatelessWidget {
                   ),
                 ),
               ),
-              SizedBox(height: 16),
+
               // Existing Scan button for GateScreen
               ElevatedButton(
                 onPressed: () {

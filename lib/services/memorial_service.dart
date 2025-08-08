@@ -90,6 +90,36 @@ class MemorialService {
     return null;
   }
 
+  /// Get memorial by QR code
+  Future<Memorial?> getMemorialByQRCode(String qrCode) async {
+    try {
+      final db = await _dbHelper.database;
+      final List<Map<String, dynamic>> maps = await db.query(
+        'memorials',
+        where: 'qr_code = ? AND deleted_at IS NULL',
+        whereArgs: [qrCode],
+      );
+      if (maps.isNotEmpty) {
+        return _mapToMemorial(maps.first);
+      }
+      return null;
+    } catch (e) {
+      print('Error getting memorial by QR code: $e');
+      return null;
+    }
+  }
+
+  /// Validate QR code exists in database
+  Future<bool> isValidQRCode(String qrCode) async {
+    try {
+      final memorial = await getMemorialByQRCode(qrCode);
+      return memorial != null;
+    } catch (e) {
+      print('Error validating QR code: $e');
+      return false;
+    }
+  }
+
   Future<int> insertMemorial(Memorial memorial) async {
     final db = await _dbHelper.database;
     return await db.insert('memorials', _memorialToMap(memorial));

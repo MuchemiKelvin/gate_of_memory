@@ -204,8 +204,9 @@ class RealHologramService {
 
   /// Dispose hologram service
   void dispose() {
-    _hologramController.close();
-    _statusController.close();
+    // Don't close stream controllers for singleton pattern
+    // _hologramController.close();
+    // _statusController.close();
     print('Real hologram service disposed');
   }
 } 

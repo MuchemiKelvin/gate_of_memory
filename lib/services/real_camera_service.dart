@@ -292,8 +292,9 @@ class RealCameraService {
   /// Dispose camera service
   void dispose() {
     _cameraController?.dispose();
-    _frameDataController.close();
-    _statusController.close();
+    // Don't close stream controllers for singleton pattern
+    // _frameDataController.close();
+    // _statusController.close();
     print('Real camera service disposed');
   }
 } 

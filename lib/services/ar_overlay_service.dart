@@ -525,9 +525,12 @@ class AROverlayService {
   }
   
   String _getMemorialTitle(String hologramId) {
-    if (hologramId.contains('NAOMI')) return 'Naomi N.';
-    if (hologramId.contains('JOHN')) return 'John M.';
-    if (hologramId.contains('SARAH')) return 'Sarah K.';
+    // Remove 'hologram_' prefix if present
+    final cleanId = hologramId.replaceFirst('hologram_', '');
+    
+    if (cleanId.contains('NAOMI')) return 'Naomi N.';
+    if (cleanId.contains('JOHN')) return 'John M.';
+    if (cleanId.contains('SARAH')) return 'Sarah K.';
     return 'Memorial';
   }
   
@@ -541,9 +544,13 @@ class AROverlayService {
     
     // Extract memorial ID from hologram ID
     final hologramId = hologramOverlay.id;
-    if (hologramId.contains('NAOMI')) return 'NAOMI-N-MEMORIAL-001';
-    if (hologramId.contains('JOHN')) return 'JOHN-M-MEMORIAL-002';
-    if (hologramId.contains('SARAH')) return 'SARAH-K-MEMORIAL-003';
+    // Remove 'hologram_' prefix if present
+    final cleanId = hologramId.replaceFirst('hologram_', '');
+    
+    // Return the clean memorial ID
+    if (cleanId.contains('NAOMI') || cleanId.contains('JOHN') || cleanId.contains('SARAH')) {
+      return cleanId;
+    }
     return null;
   }
 
