@@ -44,6 +44,20 @@ class _AROverlayWidgetState extends State<AROverlayWidget> {
         
         // AR Overlays
         ...widget.overlayService.visibleOverlays.map((overlay) {
+          // Handle full-screen overlays (hologram type)
+          if (overlay.type == AROverlayType.hologram) {
+            return Positioned.fill(
+              child: Transform.scale(
+                scale: overlay.scale,
+                child: Transform.rotate(
+                  angle: overlay.rotation * math.pi / 180,
+                  child: _buildOverlayWidget(overlay),
+                ),
+              ),
+            );
+          }
+          
+          // Handle positioned overlays
           return Positioned(
             left: overlay.position.dx,
             top: overlay.position.dy,

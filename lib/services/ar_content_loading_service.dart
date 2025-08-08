@@ -229,9 +229,9 @@ class ARContentLoadingService {
               fullText: 'This is a fallback test story that appears when no memorial is found in the database. It allows the AR system to function for testing purposes.',
             ),
           ],
-          position: markerData['position'] ?? {'x': 0.0, 'y': 0.0, 'z': 0.0},
-          scale: markerData['scale'] ?? 1.0,
-          rotation: markerData['rotation'] ?? 0.0,
+          position: _convertPositionToDouble(markerData['position']) ?? {'x': 0.0, 'y': 0.0, 'z': 0.0},
+          scale: (markerData['scale'] ?? 1).toDouble(),
+          rotation: (markerData['rotation'] ?? 0).toDouble(),
         );
         
         _loadingProgress = 1.0;
@@ -252,9 +252,9 @@ class ARContentLoadingService {
         videoPaths: targetMemorial.videoPath.isNotEmpty ? [targetMemorial.videoPath] : [],
         audioPaths: targetMemorial.audioPaths,
         stories: targetMemorial.stories,
-        position: markerData['position'] ?? {'x': 0.0, 'y': 0.0, 'z': 0.0},
-        scale: markerData['scale'] ?? 1.0,
-        rotation: markerData['rotation'] ?? 0.0,
+        position: _convertPositionToDouble(markerData['position']) ?? {'x': 0.0, 'y': 0.0, 'z': 0.0},
+        scale: (markerData['scale'] ?? 1).toDouble(),
+        rotation: (markerData['rotation'] ?? 0).toDouble(),
       );
       
       _loadingProgress = 1.0;
@@ -294,9 +294,9 @@ class ARContentLoadingService {
         title: markerData['name'] ?? 'Hologram',
         description: 'AR Hologram Content',
         hologramPath: hologramPath,
-        position: markerData['position'] ?? {'x': 0.0, 'y': 0.0, 'z': 0.0},
-        scale: markerData['scale'] ?? 1.0,
-        rotation: markerData['rotation'] ?? 0.0,
+        position: _convertPositionToDouble(markerData['position']) ?? {'x': 0.0, 'y': 0.0, 'z': 0.0},
+        scale: (markerData['scale'] ?? 1).toDouble(),
+        rotation: (markerData['rotation'] ?? 0).toDouble(),
       );
       
       _loadingProgress = 1.0;
@@ -324,9 +324,9 @@ class ARContentLoadingService {
         title: 'Test Hologram',
         description: 'Test AR content for development',
         hologramPath: 'assets/animation/hologram.mp4',
-        position: markerData['position'] ?? {'x': 0.0, 'y': 0.0, 'z': 0.0},
-        scale: markerData['scale'] ?? 1.0,
-        rotation: markerData['rotation'] ?? 0.0,
+        position: _convertPositionToDouble(markerData['position']) ?? {'x': 0.0, 'y': 0.0, 'z': 0.0},
+        scale: (markerData['scale'] ?? 1).toDouble(),
+        rotation: (markerData['rotation'] ?? 0).toDouble(),
       );
       
       _loadingProgress = 1.0;

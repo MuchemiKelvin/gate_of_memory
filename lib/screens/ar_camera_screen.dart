@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import '../services/real_ar_session_manager.dart';
 import '../widgets/ar_overlay_widget.dart';
 import '../services/database_init_service.dart';
@@ -20,6 +21,7 @@ class _ARCameraScreenState extends State<ARCameraScreen> {
   bool _showCameraControls = false;
   bool _showContentInfo = false;
   bool _cameraInitialized = false;
+  bool _showQRCodePanel = false;
 
   @override
   void initState() {
@@ -88,6 +90,12 @@ class _ARCameraScreenState extends State<ARCameraScreen> {
   void _toggleCameraControls() {
     setState(() {
       _showCameraControls = !_showCameraControls;
+    });
+  }
+
+  void _toggleQRCodePanel() {
+    setState(() {
+      _showQRCodePanel = !_showQRCodePanel;
     });
   }
 
@@ -177,16 +185,18 @@ class _ARCameraScreenState extends State<ARCameraScreen> {
           ),
         ],
       ),
-      body: Stack(
-        children: [
-          // Camera Preview
-          Container(
-            width: double.infinity,
-            height: double.infinity,
-            child: _cameraInitialized
-                ? _buildCameraPreview()
-                : _buildCameraLoadingView(),
-          ),
+             body: AROverlayWidget(
+         overlayService: _realARSessionManager.overlayService,
+         child: Stack(
+           children: [
+             // Camera Preview
+             Container(
+               width: double.infinity,
+               height: double.infinity,
+               child: _cameraInitialized
+                   ? _buildCameraPreview()
+                   : _buildCameraLoadingView(),
+             ),
           
           // AR Status Overlay
           Positioned(
@@ -301,10 +311,72 @@ class _ARCameraScreenState extends State<ARCameraScreen> {
                 ),
               ),
             ),
-        ],
-      ),
-    );
-  }
+          
+          // QR Code Panel Toggle Button
+          Positioned(
+            top: 100,
+            right: 20,
+            child: FloatingActionButton(
+              heroTag: 'qr_panel_toggle',
+              onPressed: _toggleQRCodePanel,
+              backgroundColor: Color(0xFF7bb6e7),
+              mini: true,
+              child: Icon(
+                _showQRCodePanel ? Icons.qr_code_scanner : Icons.qr_code,
+                color: Colors.white,
+              ),
+            ),
+          ),
+          
+                     // QR Code Display Panel
+           if (_showQRCodePanel)
+             Positioned(
+               top: 160,
+               right: 20,
+               child: Container(
+                 width: 200,
+                 height: 300, // Fixed height to prevent overflow
+                 padding: EdgeInsets.all(16),
+                 decoration: BoxDecoration(
+                   color: Colors.black.withOpacity(0.8),
+                   borderRadius: BorderRadius.circular(12),
+                   border: Border.all(color: Color(0xFF7bb6e7), width: 2),
+                 ),
+                 child: Column(
+                   mainAxisSize: MainAxisSize.min,
+                   children: [
+                     Text(
+                       'Scan These QR Codes',
+                       style: TextStyle(
+                         color: Colors.white,
+                         fontSize: 14,
+                         fontWeight: FontWeight.bold,
+                       ),
+                     ),
+                     SizedBox(height: 12),
+                     Expanded(
+                       child: SingleChildScrollView(
+                         child: Column(
+                           mainAxisSize: MainAxisSize.min,
+                           children: [
+                             _buildQRCodeItem('NAOMI-N-MEMORIAL-001', 'Naomi N.'),
+                             SizedBox(height: 8),
+                             _buildQRCodeItem('JOHN-M-MEMORIAL-002', 'John M.'),
+                             SizedBox(height: 8),
+                             _buildQRCodeItem('SARAH-K-MEMORIAL-003', 'Sarah K.'),
+                           ],
+                         ),
+                       ),
+                     ),
+                   ],
+                 ),
+               ),
+             ),
+           ],
+         ),
+       ),
+     );
+   }
 
   Widget _buildCameraPreview() {
     final cameraController = _realARSessionManager.cameraService.cameraController;
@@ -354,7 +426,7 @@ class _ARCameraScreenState extends State<ARCameraScreen> {
             CircularProgressIndicator(
               color: Color(0xFF7bb6e7),
             ),
-            SizedBox(height: 16),
+            SizedBox(height: 8),
             Text(
               'Initializing Real Camera...',
               style: TextStyle(
@@ -373,6 +445,53 @@ class _ARCameraScreenState extends State<ARCameraScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildQRCodeItem(String qrData, String title) {
+    return Container(
+      padding: EdgeInsets.all(6),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: Color(0xFF7bb6e7), width: 1),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          SizedBox(height: 2),
+          Container(
+            width: 50,
+            height: 50,
+            child: QrImageView(
+              data: qrData,
+              size: 50,
+              backgroundColor: Colors.white,
+              version: QrVersions.auto,
+              errorCorrectionLevel: QrErrorCorrectLevel.H,
+            ),
+          ),
+          SizedBox(height: 2),
+          Text(
+            qrData,
+            style: TextStyle(
+              color: Colors.grey[300],
+              fontSize: 7,
+            ),
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
       ),
     );
   }

@@ -75,9 +75,9 @@ class RealHologramService {
       );
       
       _scale = vector.Vector3(
-        hologramData['scale'] ?? 1.0,
-        hologramData['scale'] ?? 1.0,
-        hologramData['scale'] ?? 1.0,
+        (hologramData['scale'] ?? 1).toDouble(),
+        (hologramData['scale'] ?? 1).toDouble(),
+        (hologramData['scale'] ?? 1).toDouble(),
       );
       
       _isRendering = true;

@@ -33,6 +33,9 @@ class RealARSessionManager {
   DateTime? _sessionStartTime;
   String? _currentMarkerId;
   Map<String, dynamic>? _currentARContent;
+  
+  // Content state tracking
+  String? _currentlyLoadedContent;
 
   // Stream subscriptions
   StreamSubscription? _cameraFrameSubscription;
@@ -131,6 +134,10 @@ class RealARSessionManager {
     try {
       print('Starting REAL AR session...');
       
+      // Reset content state for new session
+      _currentlyLoadedContent = null;
+      _overlayService.clearOverlays();
+      
       // Start camera preview
       await _cameraService.startPreview();
       
@@ -185,22 +192,22 @@ class RealARSessionManager {
 
   /// Trigger QR detection processing
   void _triggerQRDetection() {
-    // Simulate QR detection with the known QR codes
-    final knownQRCodes = [
-      'NAOMI-N-MEMORIAL-001',
-      'JOHN-M-MEMORIAL-002', 
-      'SARAH-K-MEMORIAL-003',
-    ];
+    // Only trigger detection once per session
+    if (_currentlyLoadedContent != null) {
+      return; // Content already loaded, don't detect again
+    }
     
-    // Simulate detection with some randomness
-    final random = DateTime.now().millisecondsSinceEpoch % 100;
-    if (random < 15) { // 15% chance of detection per frame
-      final qrCode = knownQRCodes[random % knownQRCodes.length];
-      final confidence = 0.8 + (random / 100.0);
+    // Focus on only Naomi N. memorial for testing
+    final targetQRCode = 'NAOMI-N-MEMORIAL-001';
+    
+    // Simulate detection with very low frequency
+    final random = DateTime.now().millisecondsSinceEpoch % 1000;
+    if (random < 1) { // 0.1% chance of detection per frame (very rare)
+      final confidence = 0.95; // High confidence
       
       // Simulate detection result
       final detectionData = {
-        'qrCode': qrCode,
+        'qrCode': targetQRCode,
         'confidence': confidence,
         'timestamp': DateTime.now().millisecondsSinceEpoch,
         'position': {
@@ -222,6 +229,12 @@ class RealARSessionManager {
     final confidence = detectionData['confidence'] as double?;
     
     if (qrCode != null && confidence != null && confidence > 0.7) {
+      // Simple check - only load if not already loaded
+      if (_currentlyLoadedContent == qrCode) {
+        print('Content already loaded for: $qrCode');
+        return;
+      }
+      
       print('Real QR detected: $qrCode (${(confidence * 100).toStringAsFixed(1)}%)');
       
       _currentMarkerId = qrCode;
@@ -265,9 +278,13 @@ class RealARSessionManager {
           'scale': 1.0,
         });
 
+        // Clear all overlays and show the content
         _overlayService.clearOverlays();
         _overlayService.showHologram('hologram_$markerId');
         _overlayService.showInfo('Real AR content loaded: ${content.title}');
+        
+        // Mark this content as loaded
+        _currentlyLoadedContent = markerId;
         
         print('Real AR content loaded: ${content.title}');
       } else {

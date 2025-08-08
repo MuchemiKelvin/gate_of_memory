@@ -203,11 +203,18 @@ class AROverlayService {
   /// Build marker detection widget
   Widget _buildMarkerDetectionWidget(String markerId) {
     return Container(
-      padding: EdgeInsets.all(16),
+      padding: EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.green.withOpacity(0.9),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.white, width: 2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.3),
+            blurRadius: 10,
+            spreadRadius: 2,
+          ),
+        ],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -215,22 +222,39 @@ class AROverlayService {
           Icon(
             Icons.qr_code_scanner,
             color: Colors.white,
-            size: 32,
+            size: 40,
           ),
-          SizedBox(height: 8),
+          SizedBox(height: 12),
           Text(
-            'Marker Detected!',
+            'Memorial Found!',
             style: TextStyle(
               color: Colors.white,
-              fontSize: 16,
+              fontSize: 18,
               fontWeight: FontWeight.bold,
             ),
           ),
+          SizedBox(height: 8),
           Text(
-            'ID: $markerId',
+            _getMemorialTitle(markerId),
             style: TextStyle(
-              color: Colors.white70,
-              fontSize: 12,
+              color: Colors.white,
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          SizedBox(height: 8),
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              'Loading content...',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+              ),
             ),
           ),
         ],
@@ -240,57 +264,230 @@ class AROverlayService {
 
   /// Build hologram widget
   Widget _buildHologramWidget(String hologramId) {
-    return Container(
-      width: 200,
-      height: 200,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Color(0xFF7bb6e7).withOpacity(0.5),
-            blurRadius: 20,
-            spreadRadius: 5,
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: Container(
-          color: Colors.black,
-          child: Stack(
-            children: [
-              // Hologram placeholder
-              Center(
-                child: Icon(
-                  Icons.view_in_ar,
-                  size: 80,
-                  color: Color(0xFF7bb6e7),
-                ),
-              ),
-              // Hologram ID
-              Positioned(
-                bottom: 8,
-                left: 8,
-                child: Container(
-                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.7),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    hologramId,
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 10,
-                    ),
-                  ),
-                ),
-              ),
+    return SizedBox.expand(
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Colors.black.withOpacity(0.95),
+              Colors.black.withOpacity(0.85),
+              Colors.black.withOpacity(0.9),
             ],
           ),
+          boxShadow: [
+            BoxShadow(
+              color: Color(0xFF7bb6e7).withOpacity(0.3),
+              blurRadius: 30,
+              spreadRadius: 10,
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            // Header with memorial info
+            Container(
+              padding: EdgeInsets.symmetric(vertical: 20, horizontal: 24),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Color(0xFF7bb6e7).withOpacity(0.4),
+                    Color(0xFF7bb6e7).withOpacity(0.2),
+                  ],
+                ),
+                border: Border(
+                  bottom: BorderSide(
+                    color: Color(0xFF7bb6e7).withOpacity(0.5),
+                    width: 2,
+                  ),
+                ),
+              ),
+              child: Column(
+                children: [
+                  Icon(
+                    Icons.auto_awesome,
+                    size: 48,
+                    color: Color(0xFF7bb6e7),
+                  ),
+                  SizedBox(height: 12),
+                  Text(
+                    _getMemorialTitle(hologramId),
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    'Memorial Experience',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            
+            // Content area
+            Expanded(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.all(24),
+                child: Column(
+                  children: [
+                    // Hologram preview area
+                    Container(
+                      height: 200,
+                      margin: EdgeInsets.only(bottom: 32),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            Color(0xFF7bb6e7).withOpacity(0.3),
+                            Color(0xFF7bb6e7).withOpacity(0.1),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: Color(0xFF7bb6e7).withOpacity(0.6),
+                          width: 3,
+                        ),
+                      ),
+                      child: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.play_circle_outline,
+                              size: 80,
+                              color: Color(0xFF7bb6e7),
+                            ),
+                            SizedBox(height: 16),
+                            Text(
+                              'Hologram Preview',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    
+                    // Interactive content buttons
+                    Text(
+                      'Explore Content',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    SizedBox(height: 24),
+                    
+                    // First row of buttons
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        _buildContentButton(Icons.photo, 'Photos', isLarge: true),
+                        _buildContentButton(Icons.video_library, 'Videos', isLarge: true),
+                        _buildContentButton(Icons.audiotrack, 'Audio', isLarge: true),
+                      ],
+                    ),
+                    SizedBox(height: 20),
+                    
+                    // Second row of buttons
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        _buildContentButton(Icons.book, 'Stories', isLarge: true),
+                        _buildContentButton(Icons.info, 'Info', isLarge: true),
+                        _buildContentButton(Icons.close, 'Close', isLarge: true),
+                      ],
+                    ),
+                    
+                    SizedBox(height: 40),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
+  }
+  
+  Widget _buildContentButton(IconData icon, String label, {bool isLarge = false}) {
+    return GestureDetector(
+      onTap: () {
+        print('Tapped: $label');
+        if (label == 'Close') {
+          // TODO: Close the overlay
+          print('Closing overlay...');
+        }
+        // TODO: Navigate to specific content
+      },
+      child: Container(
+        padding: EdgeInsets.all(isLarge ? 16 : 8),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFF7bb6e7).withOpacity(0.4),
+              Color(0xFF7bb6e7).withOpacity(0.2),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(isLarge ? 16 : 8),
+          border: Border.all(
+            color: Color(0xFF7bb6e7).withOpacity(0.6),
+            width: isLarge ? 2 : 1,
+          ),
+          boxShadow: isLarge ? [
+            BoxShadow(
+              color: Color(0xFF7bb6e7).withOpacity(0.3),
+              blurRadius: 8,
+              spreadRadius: 2,
+            ),
+          ] : null,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon, 
+              color: Colors.white, 
+              size: isLarge ? 32 : 20,
+            ),
+            SizedBox(height: isLarge ? 8 : 4),
+            Text(
+              label,
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: isLarge ? 14 : 10,
+                fontWeight: isLarge ? FontWeight.w600 : FontWeight.normal,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  String _getMemorialTitle(String hologramId) {
+    if (hologramId.contains('NAOMI')) return 'Naomi N.';
+    if (hologramId.contains('JOHN')) return 'John M.';
+    if (hologramId.contains('SARAH')) return 'Sarah K.';
+    return 'Memorial';
   }
 
   /// Build info widget
