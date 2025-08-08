@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'audio_player_fullscreen_page.dart';
+import '../services/memorial_service.dart';
+import '../models/memorial.dart';
 
 class AudioPage extends StatefulWidget {
-  final List<String> audioPaths;
+  final String? memorialId;
   
   const AudioPage({
     super.key,
-    required this.audioPaths,
+    this.memorialId,
   });
 
   @override
@@ -14,16 +16,55 @@ class AudioPage extends StatefulWidget {
 }
 
 class _AudioPageState extends State<AudioPage> {
+  bool isGrid = true;
+  Memorial? memorial;
+  List<String> audioPaths = [];
+  bool isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMemorialData();
+  }
+
+  Future<void> _loadMemorialData() async {
+    if (widget.memorialId == null) {
+      setState(() {
+        isLoading = false;
+      });
+      return;
+    }
+
+    try {
+      final memorialService = MemorialService();
+      final memorials = await memorialService.getAllMemorials();
+      
+      // Find memorial by QR code
+      final foundMemorial = memorials.firstWhere(
+        (m) => m.qrCode == widget.memorialId,
+        orElse: () => throw Exception('Memorial not found'),
+      );
+
+      setState(() {
+        memorial = foundMemorial;
+        audioPaths = foundMemorial.audioPaths.where((path) => path.isNotEmpty).toList();
+        isLoading = false;
+      });
+    } catch (e) {
+      print('Error loading memorial data: $e');
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
+
   void _openAudioPlayer(int index) {
-    final audioPath = widget.audioPaths[index];
-    final title = _getAudioTitle(audioPath);
-    
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => AudioPlayerFullscreenPage(
-          audioPath: audioPath,
-          title: title,
+          audioPath: audioPaths[index],
+          title: memorial?.name ?? 'Audio',
         ),
       ),
     );
@@ -31,38 +72,29 @@ class _AudioPageState extends State<AudioPage> {
 
   String _getAudioTitle(String audioPath) {
     // Extract title from path
-    final fileName = audioPath.split('/').last;
-    final nameWithoutExtension = fileName.split('.').first;
-    
-    // Convert to readable title
-    return nameWithoutExtension
-        .split('_')
-        .map((word) => word[0].toUpperCase() + word.substring(1))
-        .join(' ');
+    final fileName = audioPath.split('/').last.replaceAll('.mp3', '');
+    return fileName.replaceAll('_', ' ').toUpperCase();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Audio (${widget.audioPaths.length})'),
+        title: Text('Audio${memorial != null ? ' - ${memorial!.name}' : ''}'),
         backgroundColor: Color(0xFF7bb6e7),
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
+        ),
         actions: [
-          // Debug button
           IconButton(
-            icon: const Icon(Icons.bug_report),
+            icon: Icon(isGrid ? Icons.view_list : Icons.grid_view),
+            tooltip: isGrid ? 'List View' : 'Grid View',
             onPressed: () {
-              print('=== AUDIO DEBUG INFO ===');
-              print('Audio paths: ${widget.audioPaths}');
-              for (int i = 0; i < widget.audioPaths.length; i++) {
-                print('  $i: ${widget.audioPaths[i]}');
-              }
-              print('=======================');
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Debug info printed to console')),
-              );
+              setState(() {
+                isGrid = !isGrid;
+              });
             },
-            tooltip: 'Debug Info',
           ),
         ],
       ),
@@ -78,19 +110,17 @@ class _AudioPageState extends State<AudioPage> {
             end: Alignment.bottomRight,
           ),
         ),
-        child: widget.audioPaths.isEmpty
+        child: isLoading
             ? Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(
-                      Icons.audiotrack,
-                      size: 64,
-                      color: Colors.grey[400],
+                    CircularProgressIndicator(
+                      color: Color(0xFF7bb6e7),
                     ),
                     SizedBox(height: 16),
                     Text(
-                      'No audio files available',
+                      'Loading audio...',
                       style: TextStyle(
                         color: Colors.grey[600],
                         fontSize: 16,
@@ -99,51 +129,146 @@ class _AudioPageState extends State<AudioPage> {
                   ],
                 ),
               )
-            : ListView.builder(
-                padding: EdgeInsets.all(16),
-                itemCount: widget.audioPaths.length,
-                itemBuilder: (context, index) {
-                  final audioPath = widget.audioPaths[index];
-                  final title = _getAudioTitle(audioPath);
-                  
-                  return GestureDetector(
-                    onTap: () => _openAudioPlayer(index),
-                    child: Card(
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      elevation: 4,
-                      margin: EdgeInsets.only(bottom: 16),
-                      child: ListTile(
-                        leading: Icon(
-                          Icons.audiotrack, 
-                          color: Color(0xFF7bb6e7), 
-                          size: 32
+            : audioPaths.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.audiotrack,
+                          size: 64,
+                          color: Colors.grey[400],
                         ),
-                        title: Text(
-                          title,
-                          style: TextStyle(
-                            fontSize: 18,
-                            color: Color(0xFF2d3a4a),
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        subtitle: Text(
-                          'Tap to play',
+                        SizedBox(height: 16),
+                        Text(
+                          'No audio available',
                           style: TextStyle(
                             color: Colors.grey[600],
-                            fontSize: 12,
+                            fontSize: 16,
                           ),
                         ),
-                        trailing: Icon(
-                          Icons.play_arrow, 
-                          color: Color(0xFF7bb6e7)
-                        ),
-                      ),
+                        if (memorial != null) ...[
+                          SizedBox(height: 8),
+                          Text(
+                            'for ${memorial!.name}',
+                            style: TextStyle(
+                              color: Colors.grey[500],
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
-                  );
-                },
-              ),
+                  )
+                : isGrid
+                    ? GridView.builder(
+                        padding: EdgeInsets.all(16),
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          mainAxisSpacing: 16,
+                          crossAxisSpacing: 16,
+                          childAspectRatio: 1,
+                        ),
+                        itemCount: audioPaths.length,
+                        itemBuilder: (context, index) {
+                          return GestureDetector(
+                            onTap: () => _openAudioPlayer(index),
+                            child: Card(
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              elevation: 4,
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(16),
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                    colors: [
+                                      Color(0xFF7bb6e7).withOpacity(0.8),
+                                      Color(0xFF7bb6e7).withOpacity(0.6),
+                                    ],
+                                  ),
+                                ),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.play_circle_outline,
+                                      size: 48,
+                                      color: Colors.white,
+                                    ),
+                                    SizedBox(height: 12),
+                                    Padding(
+                                      padding: EdgeInsets.symmetric(horizontal: 12),
+                                      child: Text(
+                                        _getAudioTitle(audioPaths[index]),
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                        textAlign: TextAlign.center,
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      )
+                    : ListView.builder(
+                        padding: EdgeInsets.all(16),
+                        itemCount: audioPaths.length,
+                        itemBuilder: (context, index) {
+                          return Card(
+                            margin: EdgeInsets.only(bottom: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            elevation: 4,
+                            child: ListTile(
+                              contentPadding: EdgeInsets.all(16),
+                              leading: Container(
+                                width: 60,
+                                height: 60,
+                                decoration: BoxDecoration(
+                                  color: Color(0xFF7bb6e7),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Icon(
+                                  Icons.play_arrow,
+                                  color: Colors.white,
+                                  size: 32,
+                                ),
+                              ),
+                              title: Text(
+                                _getAudioTitle(audioPaths[index]),
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              subtitle: Text(
+                                'Memorial Audio',
+                                style: TextStyle(
+                                  color: Colors.grey[600],
+                                  fontSize: 14,
+                                ),
+                              ),
+                              trailing: Icon(
+                                Icons.play_circle_outline,
+                                color: Color(0xFF7bb6e7),
+                                size: 32,
+                              ),
+                              onTap: () => _openAudioPlayer(index),
+                            ),
+                          );
+                        },
+                      ),
       ),
     );
   }

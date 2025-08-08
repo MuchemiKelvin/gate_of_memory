@@ -4,6 +4,10 @@ import 'package:qr_flutter/qr_flutter.dart';
 import '../services/real_ar_session_manager.dart';
 import '../widgets/ar_overlay_widget.dart';
 import '../services/database_init_service.dart';
+import 'images_page.dart';
+import 'videos_page.dart';
+import 'audio_page.dart';
+import 'stories_page.dart';
 
 class ARCameraScreen extends StatefulWidget {
   const ARCameraScreen({super.key});
@@ -27,6 +31,7 @@ class _ARCameraScreenState extends State<ARCameraScreen> {
   void initState() {
     super.initState();
     _initializeRealAR();
+    _setupNavigationCallback();
   }
 
   Future<void> _initializeRealAR() async {
@@ -97,6 +102,89 @@ class _ARCameraScreenState extends State<ARCameraScreen> {
     setState(() {
       _showQRCodePanel = !_showQRCodePanel;
     });
+  }
+  
+  /// Setup navigation callback for AR overlays
+  void _setupNavigationCallback() {
+    _realARSessionManager.overlayService.setNavigationCallback(_navigateToScreen);
+  }
+  
+  /// Navigate to specific screen with arguments
+  void _navigateToScreen(String screen, Map<String, dynamic>? arguments) {
+    print('Navigating to: $screen with arguments: $arguments');
+    
+    // Close the AR overlay first
+    _realARSessionManager.overlayService.clearOverlays();
+    
+    // Get memorial ID from arguments
+    final memorialId = arguments?['memorialId'] as String?;
+    
+    // Navigate based on screen name
+    switch (screen) {
+      case '/images':
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ImagesPage(memorialId: memorialId),
+          ),
+        );
+        break;
+      case '/videos':
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => VideosPage(memorialId: memorialId),
+          ),
+        );
+        break;
+      case '/audio':
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => AudioPage(memorialId: memorialId),
+          ),
+        );
+        break;
+      case '/stories':
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => StoriesPage(memorialId: memorialId),
+          ),
+        );
+        break;
+      case '/memorial-details':
+        Navigator.pushNamed(context, '/memorial-details', arguments: arguments);
+        break;
+      default:
+        print('Unknown screen: $screen');
+    }
+  }
+  
+  /// Show content message for unimplemented features
+  void _showContentMessage(String contentType, String? memorialId) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('$contentType Content'),
+        content: Text('$contentType content for ${_getMemorialName(memorialId)} will be displayed here.\n\nThis feature is coming soon!'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  /// Get memorial name from ID
+  String _getMemorialName(String? memorialId) {
+    if (memorialId == null) return 'Unknown Memorial';
+    if (memorialId.contains('NAOMI')) return 'Naomi N.';
+    if (memorialId.contains('JOHN')) return 'John M.';
+    if (memorialId.contains('SARAH')) return 'Sarah K.';
+    return 'Unknown Memorial';
   }
 
   void _showARSettings() {

@@ -192,7 +192,7 @@ class MemorialDetailScreen extends StatelessWidget {
                 context,
                 MaterialPageRoute(
                   builder: (context) => ImagesPage(
-                    imagePaths: [memorial.imagePath],
+                    memorialId: memorial.qrCode,
                   ),
                 ),
               );
@@ -210,7 +210,7 @@ class MemorialDetailScreen extends StatelessWidget {
                 context,
                 MaterialPageRoute(
                   builder: (context) => VideosPage(
-                    videoPaths: [memorial.videoPath],
+                    memorialId: memorial.qrCode,
                   ),
                 ),
               );
@@ -228,7 +228,7 @@ class MemorialDetailScreen extends StatelessWidget {
                 context,
                 MaterialPageRoute(
                   builder: (context) => AudioPage(
-                    audioPaths: memorial.audioPaths,
+                    memorialId: memorial.qrCode,
                   ),
                 ),
               );
@@ -245,7 +245,7 @@ class MemorialDetailScreen extends StatelessWidget {
                 context,
                 MaterialPageRoute(
                   builder: (context) => StoriesPage(
-                    stories: memorial.stories,
+                    memorialId: memorial.qrCode,
                   ),
                 ),
               );

@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'video_player_fullscreen_page.dart';
+import '../services/memorial_service.dart';
+import '../models/memorial.dart';
 
 class VideosPage extends StatefulWidget {
-  final List<String> videoPaths;
+  final String? memorialId;
   
   const VideosPage({
     super.key,
-    required this.videoPaths,
+    this.memorialId,
   });
 
   @override
@@ -15,13 +17,53 @@ class VideosPage extends StatefulWidget {
 
 class _VideosPageState extends State<VideosPage> {
   bool isGrid = true;
+  Memorial? memorial;
+  List<String> videoPaths = [];
+  bool isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMemorialData();
+  }
+
+  Future<void> _loadMemorialData() async {
+    if (widget.memorialId == null) {
+      setState(() {
+        isLoading = false;
+      });
+      return;
+    }
+
+    try {
+      final memorialService = MemorialService();
+      final memorials = await memorialService.getAllMemorials();
+      
+      // Find memorial by QR code
+      final foundMemorial = memorials.firstWhere(
+        (m) => m.qrCode == widget.memorialId,
+        orElse: () => throw Exception('Memorial not found'),
+      );
+
+      setState(() {
+        memorial = foundMemorial;
+        videoPaths = [foundMemorial.videoPath].where((path) => path != null && path.isNotEmpty).toList();
+        isLoading = false;
+      });
+    } catch (e) {
+      print('Error loading memorial data: $e');
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
 
   void _openVideoPlayer(int index) {
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => VideoPlayerFullscreenPage(
-          videoPath: widget.videoPaths[index],
+          videoPath: videoPaths[index],
         ),
       ),
     );
@@ -31,8 +73,12 @@ class _VideosPageState extends State<VideosPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Videos (${widget.videoPaths.length})'),
+        title: Text('Videos${memorial != null ? ' - ${memorial!.name}' : ''}'),
         backgroundColor: Color(0xFF7bb6e7),
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
+        ),
         actions: [
           IconButton(
             icon: Icon(isGrid ? Icons.view_list : Icons.grid_view),
@@ -57,19 +103,17 @@ class _VideosPageState extends State<VideosPage> {
             end: Alignment.bottomRight,
           ),
         ),
-        child: widget.videoPaths.isEmpty
+        child: isLoading
             ? Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(
-                      Icons.video_library,
-                      size: 64,
-                      color: Colors.grey[400],
+                    CircularProgressIndicator(
+                      color: Color(0xFF7bb6e7),
                     ),
                     SizedBox(height: 16),
                     Text(
-                      'No videos available',
+                      'Loading videos...',
                       style: TextStyle(
                         color: Colors.grey[600],
                         fontSize: 16,
@@ -78,110 +122,158 @@ class _VideosPageState extends State<VideosPage> {
                   ],
                 ),
               )
-            : isGrid
-                ? GridView.builder(
-                    padding: EdgeInsets.all(16),
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      mainAxisSpacing: 16,
-                      crossAxisSpacing: 16,
-                      childAspectRatio: 1,
+            : videoPaths.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.video_library,
+                          size: 64,
+                          color: Colors.grey[400],
+                        ),
+                        SizedBox(height: 16),
+                        Text(
+                          'No videos available',
+                          style: TextStyle(
+                            color: Colors.grey[600],
+                            fontSize: 16,
+                          ),
+                        ),
+                        if (memorial != null) ...[
+                          SizedBox(height: 8),
+                          Text(
+                            'for ${memorial!.name}',
+                            style: TextStyle(
+                              color: Colors.grey[500],
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
-                    itemCount: widget.videoPaths.length,
-                    itemBuilder: (context, index) {
-                      return GestureDetector(
-                        onTap: () => _openVideoPlayer(index),
-                        child: Stack(
-                          children: [
-                            Card(
+                  )
+                : isGrid
+                    ? GridView.builder(
+                        padding: EdgeInsets.all(16),
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          mainAxisSpacing: 16,
+                          crossAxisSpacing: 16,
+                          childAspectRatio: 16 / 9,
+                        ),
+                        itemCount: videoPaths.length,
+                        itemBuilder: (context, index) {
+                          return GestureDetector(
+                            onTap: () => _openVideoPlayer(index),
+                            child: Card(
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(16),
                               ),
                               elevation: 4,
                               child: ClipRRect(
                                 borderRadius: BorderRadius.circular(16),
-                                child: Container(
-                                  color: Colors.grey[300],
-                                  child: Icon(
-                                    Icons.video_file,
-                                    size: 48,
-                                    color: Colors.grey[600],
-                                  ),
+                                child: Stack(
+                                  children: [
+                                    Container(
+                                      width: double.infinity,
+                                      height: double.infinity,
+                                      color: Colors.black,
+                                      child: Center(
+                                        child: Icon(
+                                          Icons.play_circle_outline,
+                                          size: 48,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ),
+                                    Positioned(
+                                      bottom: 8,
+                                      left: 8,
+                                      right: 8,
+                                      child: Container(
+                                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: Colors.black.withOpacity(0.7),
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: Text(
+                                          'Memorial Video',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                          textAlign: TextAlign.center,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ),
-                            Positioned.fill(
-                              child: Align(
-                                alignment: Alignment.center,
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    color: Colors.black.withOpacity(0.3),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  padding: EdgeInsets.all(12),
-                                  child: Icon(
-                                    Icons.play_arrow,
-                                    color: Colors.white,
-                                    size: 32,
-                                  ),
-                                ),
-                              ),
+                          );
+                        },
+                      )
+                    : ListView.builder(
+                        padding: EdgeInsets.all(16),
+                        itemCount: videoPaths.length,
+                        itemBuilder: (context, index) {
+                          return Card(
+                            margin: EdgeInsets.only(bottom: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
                             ),
-                          ],
-                        ),
-                      );
-                    },
-                  )
-                : ListView.builder(
-                    padding: EdgeInsets.all(16),
-                    itemCount: widget.videoPaths.length,
-                    itemBuilder: (context, index) {
-                      return GestureDetector(
-                        onTap: () => _openVideoPlayer(index),
-                        child: Card(
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          elevation: 4,
-                          margin: EdgeInsets.only(bottom: 16),
-                          child: Stack(
-                            children: [
-                              ClipRRect(
+                            elevation: 4,
+                            child: GestureDetector(
+                              onTap: () => _openVideoPlayer(index),
+                              child: ClipRRect(
                                 borderRadius: BorderRadius.circular(16),
-                                child: Container(
-                                  height: 180,
-                                  width: double.infinity,
-                                  color: Colors.grey[300],
-                                  child: Icon(
-                                    Icons.video_file,
-                                    size: 48,
-                                    color: Colors.grey[600],
+                                child: AspectRatio(
+                                  aspectRatio: 16 / 9,
+                                  child: Stack(
+                                    children: [
+                                      Container(
+                                        width: double.infinity,
+                                        height: double.infinity,
+                                        color: Colors.black,
+                                        child: Center(
+                                          child: Icon(
+                                            Icons.play_circle_outline,
+                                            size: 64,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      ),
+                                      Positioned(
+                                        bottom: 16,
+                                        left: 16,
+                                        right: 16,
+                                        child: Container(
+                                          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                          decoration: BoxDecoration(
+                                            color: Colors.black.withOpacity(0.7),
+                                            borderRadius: BorderRadius.circular(12),
+                                          ),
+                                          child: Text(
+                                            'Memorial Video',
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                            textAlign: TextAlign.center,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ),
-                              Positioned.fill(
-                                child: Align(
-                                  alignment: Alignment.center,
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      color: Colors.black.withOpacity(0.3),
-                                      shape: BoxShape.circle,
-                                    ),
-                                    padding: EdgeInsets.all(12),
-                                    child: Icon(
-                                      Icons.play_arrow,
-                                      color: Colors.white,
-                                      size: 32,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  ),
+                            ),
+                          );
+                        },
+                      ),
       ),
     );
   }

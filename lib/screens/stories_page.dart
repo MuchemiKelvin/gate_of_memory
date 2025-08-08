@@ -1,16 +1,63 @@
 import 'package:flutter/material.dart';
 import 'story_reader_page.dart';
+import '../services/memorial_service.dart';
 import '../models/memorial.dart';
 
-class StoriesPage extends StatelessWidget {
-  final List<Story> stories;
+class StoriesPage extends StatefulWidget {
+  final String? memorialId;
   
   const StoriesPage({
     super.key,
-    required this.stories,
+    this.memorialId,
   });
 
-  void _openStory(BuildContext context, int index) {
+  @override
+  _StoriesPageState createState() => _StoriesPageState();
+}
+
+class _StoriesPageState extends State<StoriesPage> {
+  Memorial? memorial;
+  List<Story> stories = [];
+  bool isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMemorialData();
+  }
+
+  Future<void> _loadMemorialData() async {
+    if (widget.memorialId == null) {
+      setState(() {
+        isLoading = false;
+      });
+      return;
+    }
+
+    try {
+      final memorialService = MemorialService();
+      final memorials = await memorialService.getAllMemorials();
+      
+      // Find memorial by QR code
+      final foundMemorial = memorials.firstWhere(
+        (m) => m.qrCode == widget.memorialId,
+        orElse: () => throw Exception('Memorial not found'),
+      );
+
+      setState(() {
+        memorial = foundMemorial;
+        stories = foundMemorial.stories;
+        isLoading = false;
+      });
+    } catch (e) {
+      print('Error loading memorial data: $e');
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
+
+  void _openStoryReader(int index) {
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -26,8 +73,12 @@ class StoriesPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Stories (${stories.length})'),
+        title: Text('Stories${memorial != null ? ' - ${memorial!.name}' : ''}'),
         backgroundColor: Color(0xFF7bb6e7),
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
+        ),
       ),
       body: Container(
         decoration: BoxDecoration(
@@ -41,19 +92,17 @@ class StoriesPage extends StatelessWidget {
             end: Alignment.bottomRight,
           ),
         ),
-        child: stories.isEmpty
+        child: isLoading
             ? Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(
-                      Icons.menu_book,
-                      size: 64,
-                      color: Colors.grey[400],
+                    CircularProgressIndicator(
+                      color: Color(0xFF7bb6e7),
                     ),
                     SizedBox(height: 16),
                     Text(
-                      'No stories available',
+                      'Loading stories...',
                       style: TextStyle(
                         color: Colors.grey[600],
                         fontSize: 16,
@@ -62,50 +111,155 @@ class StoriesPage extends StatelessWidget {
                   ],
                 ),
               )
-            : ListView.builder(
-                padding: EdgeInsets.all(16),
-                itemCount: stories.length,
-                itemBuilder: (context, index) {
-                  return GestureDetector(
-                    onTap: () => _openStory(context, index),
-                    child: Card(
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      elevation: 4,
-                      margin: EdgeInsets.only(bottom: 16),
-                      child: ListTile(
-                        leading: Icon(
-                          Icons.menu_book, 
-                          color: Color(0xFF7bb6e7), 
-                          size: 32
+            : stories.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.book,
+                          size: 64,
+                          color: Colors.grey[400],
                         ),
-                        title: Text(
-                          stories[index].title,
+                        SizedBox(height: 16),
+                        Text(
+                          'No stories available',
                           style: TextStyle(
-                            fontSize: 18,
-                            color: Color(0xFF2d3a4a),
-                            fontWeight: FontWeight.w600,
+                            color: Colors.grey[600],
+                            fontSize: 16,
                           ),
                         ),
-                        subtitle: Text(
-                          stories[index].snippet,
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Color(0xFF4a5a6a),
+                        if (memorial != null) ...[
+                          SizedBox(height: 8),
+                          Text(
+                            'for ${memorial!.name}',
+                            style: TextStyle(
+                              color: Colors.grey[500],
+                              fontSize: 14,
+                            ),
                           ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        trailing: Icon(
-                          Icons.arrow_forward_ios, 
-                          color: Color(0xFF7bb6e7)
-                        ),
-                      ),
+                        ],
+                      ],
                     ),
-                  );
-                },
-              ),
+                  )
+                : ListView.builder(
+                    padding: EdgeInsets.all(16),
+                    itemCount: stories.length,
+                    itemBuilder: (context, index) {
+                      final story = stories[index];
+                      return Card(
+                        margin: EdgeInsets.only(bottom: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        elevation: 4,
+                        child: InkWell(
+                          onTap: () => _openStoryReader(index),
+                          borderRadius: BorderRadius.circular(16),
+                          child: Padding(
+                            padding: EdgeInsets.all(20),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Container(
+                                      width: 50,
+                                      height: 50,
+                                      decoration: BoxDecoration(
+                                        color: Color(0xFF7bb6e7).withOpacity(0.2),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Icon(
+                                        Icons.book,
+                                        color: Color(0xFF7bb6e7),
+                                        size: 24,
+                                      ),
+                                    ),
+                                    SizedBox(width: 16),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                                                                 children: [
+                                           Text(
+                                             story.title,
+                                             style: TextStyle(
+                                               fontSize: 18,
+                                               fontWeight: FontWeight.bold,
+                                               color: Color(0xFF2d3a4a),
+                                             ),
+                                           ),
+                                          SizedBox(height: 4),
+                                          Text(
+                                            'Story ${index + 1}',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.grey[600],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    Icon(
+                                      Icons.arrow_forward_ios,
+                                      color: Color(0xFF7bb6e7),
+                                      size: 20,
+                                    ),
+                                  ],
+                                ),
+                                SizedBox(height: 16),
+                                                                 Text(
+                                   story.snippet,
+                                   style: TextStyle(
+                                     fontSize: 14,
+                                     color: Colors.grey[700],
+                                     height: 1.4,
+                                   ),
+                                   maxLines: 3,
+                                   overflow: TextOverflow.ellipsis,
+                                 ),
+                                SizedBox(height: 12),
+                                Row(
+                                  children: [
+                                    Icon(
+                                      Icons.access_time,
+                                      size: 16,
+                                      color: Colors.grey[500],
+                                    ),
+                                    SizedBox(width: 4),
+                                    Text(
+                                      'Read Story',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey[500],
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                    Spacer(),
+                                    Container(
+                                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: Color(0xFF7bb6e7).withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Text(
+                                        'Tap to read',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color: Color(0xFF7bb6e7),
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
       ),
     );
   }

@@ -7,6 +7,11 @@ import 'screens/location_settings_screen.dart';
 import 'screens/location_debug_screen.dart';
 import 'screens/geo_blocker.dart';
 import 'screens/ar_camera_screen.dart';
+import 'screens/images_page.dart';
+import 'screens/videos_page.dart';
+import 'screens/audio_page.dart';
+import 'screens/stories_page.dart';
+import 'screens/memorial_details_page.dart';
 import 'services/database_init_service.dart';
 
 // Conditional import for desktop platforms only
@@ -44,7 +49,7 @@ void main() async {
         '/location-settings': (context) => LocationSettingsScreen(),
         '/location-debug': (context) => LocationDebugScreen(),
         '/ar-camera': (context) => ARCameraScreen(),
-        // ...other routes...
+        '/memorial-details': (context) => MemorialDetailsPage(),
       },
     ),
   );

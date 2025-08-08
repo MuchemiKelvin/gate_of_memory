@@ -123,7 +123,7 @@ class MemorialDetailsPage extends StatelessWidget {
                                     context,
                                     MaterialPageRoute(
                                       builder: (_) => ImagesPage(
-                                        imagePaths: ['assets/images/memorial_card.jpeg'],
+                                        memorialId: 'NAOMI-N-MEMORIAL-001',
                                       ),
                                     ),
                                   );
@@ -144,7 +144,7 @@ class MemorialDetailsPage extends StatelessWidget {
                                     context,
                                     MaterialPageRoute(
                                       builder: (_) => VideosPage(
-                                        videoPaths: ['assets/video/memorial_video.mp4'],
+                                        memorialId: 'NAOMI-N-MEMORIAL-001',
                                       ),
                                     ),
                                   );
@@ -169,7 +169,7 @@ class MemorialDetailsPage extends StatelessWidget {
                                     context,
                                     MaterialPageRoute(
                                       builder: (_) => AudioPage(
-                                        audioPaths: ['assets/audio/victory_chime.mp3'],
+                                        memorialId: 'NAOMI-N-MEMORIAL-001',
                                       ),
                                     ),
                                   );
@@ -190,13 +190,7 @@ class MemorialDetailsPage extends StatelessWidget {
                                     context,
                                     MaterialPageRoute(
                                       builder: (_) => StoriesPage(
-                                        stories: [
-                                          Story(
-                                            title: 'A Beautiful Memory',
-                                            snippet: 'It was a sunny day when we all gathered...',
-                                            fullText: 'It was a sunny day when we all gathered at the park. Naomi smiled as she watched the children play, her laughter echoing in the air. We shared stories, food, and love, making memories that would last forever.',
-                                          ),
-                                        ],
+                                        memorialId: 'NAOMI-N-MEMORIAL-001',
                                       ),
                                     ),
                                   );

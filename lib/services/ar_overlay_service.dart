@@ -61,6 +61,14 @@ class AROverlayService {
 
   final Map<String, AROverlay> _overlays = {};
   final List<Function()> _listeners = [];
+  
+  // Navigation callback
+  Function(String screen, Map<String, dynamic>? arguments)? _navigationCallback;
+  
+  /// Set navigation callback
+  void setNavigationCallback(Function(String screen, Map<String, dynamic>? arguments) callback) {
+    _navigationCallback = callback;
+  }
 
   // Getters
   Map<String, AROverlay> get overlays => Map.unmodifiable(_overlays);
@@ -430,11 +438,44 @@ class AROverlayService {
     return GestureDetector(
       onTap: () {
         print('Tapped: $label');
+        
         if (label == 'Close') {
-          // TODO: Close the overlay
+          // Close the overlay
           print('Closing overlay...');
+          clearOverlays();
+          return;
         }
-        // TODO: Navigate to specific content
+        
+        // Navigate to specific content
+        String? screen;
+        Map<String, dynamic>? arguments;
+        
+        switch (label) {
+          case 'Photos':
+            screen = '/images';
+            arguments = {'memorialId': _getMemorialIdFromHologram()};
+            break;
+          case 'Videos':
+            screen = '/videos';
+            arguments = {'memorialId': _getMemorialIdFromHologram()};
+            break;
+          case 'Audio':
+            screen = '/audio';
+            arguments = {'memorialId': _getMemorialIdFromHologram()};
+            break;
+          case 'Stories':
+            screen = '/stories';
+            arguments = {'memorialId': _getMemorialIdFromHologram()};
+            break;
+          case 'Info':
+            screen = '/memorial-details';
+            arguments = {'memorialId': _getMemorialIdFromHologram()};
+            break;
+        }
+        
+        if (screen != null && _navigationCallback != null) {
+          _navigationCallback!(screen, arguments);
+        }
       },
       child: Container(
         padding: EdgeInsets.all(isLarge ? 16 : 8),
@@ -488,6 +529,22 @@ class AROverlayService {
     if (hologramId.contains('JOHN')) return 'John M.';
     if (hologramId.contains('SARAH')) return 'Sarah K.';
     return 'Memorial';
+  }
+  
+  /// Get memorial ID from current hologram
+  String? _getMemorialIdFromHologram() {
+    // Find the current hologram overlay
+    final hologramOverlay = _overlays.values.firstWhere(
+      (overlay) => overlay.type == AROverlayType.hologram && overlay.isVisible,
+      orElse: () => throw Exception('No hologram overlay found'),
+    );
+    
+    // Extract memorial ID from hologram ID
+    final hologramId = hologramOverlay.id;
+    if (hologramId.contains('NAOMI')) return 'NAOMI-N-MEMORIAL-001';
+    if (hologramId.contains('JOHN')) return 'JOHN-M-MEMORIAL-002';
+    if (hologramId.contains('SARAH')) return 'SARAH-K-MEMORIAL-003';
+    return null;
   }
 
   /// Build info widget
