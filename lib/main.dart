@@ -6,6 +6,7 @@ import 'screens/memorial_dashboard_screen.dart';
 import 'screens/location_settings_screen.dart';
 import 'screens/location_debug_screen.dart';
 import 'screens/geo_blocker.dart';
+import 'screens/ar_camera_screen.dart';
 
 // Conditional import for desktop platforms only
 import 'database_initializer.dart' if (dart.library.html) 'database_initializer_web.dart';
@@ -30,6 +31,7 @@ void main() async {
         '/dashboard': (context) => const MemorialDashboardScreen(),
         '/location-settings': (context) => LocationSettingsScreen(),
         '/location-debug': (context) => LocationDebugScreen(),
+        '/ar-camera': (context) => ARCameraScreen(),
         // ...other routes...
       },
     ),

@@ -38,14 +38,16 @@ dependencies:
   mobile_scanner: ^7.0.1
   video_player: ^2.8.2
   audioplayers: ^6.5.0
-  geolocator: ^14.0.2
+  geolocator: ^9.0.2
   geocoding: ^4.0.0
   device_info_plus: ^11.5.0
   http: ^1.1.0
   sqflite: ^2.3.0
   sqflite_common_ffi: ^2.3.2
   path: ^1.8.3
-  # carrier_info: removed
+  
+  # AR and Camera Dependencies (temporarily simplified)
+  vector_math: ^2.1.4
 
 dev_dependencies:
   flutter_test:

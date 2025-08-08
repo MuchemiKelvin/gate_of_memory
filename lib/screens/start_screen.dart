@@ -91,6 +91,22 @@ class StartScreen extends StatelessWidget {
                 ),
               ),
               SizedBox(height: 16),
+              ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.pushNamed(context, '/ar-camera');
+                },
+                icon: Icon(Icons.view_in_ar, size: 24),
+                label: Text('AR Camera', style: TextStyle(fontSize: 18)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Color(0xFF2d3a4a),
+                  foregroundColor: Colors.white,
+                  padding: EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+              SizedBox(height: 16),
               // Existing Scan button for GateScreen
               ElevatedButton(
                 onPressed: () {
