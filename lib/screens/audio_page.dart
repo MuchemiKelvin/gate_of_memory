@@ -47,6 +47,24 @@ class _AudioPageState extends State<AudioPage> {
       appBar: AppBar(
         title: Text('Audio (${widget.audioPaths.length})'),
         backgroundColor: Color(0xFF7bb6e7),
+        actions: [
+          // Debug button
+          IconButton(
+            icon: const Icon(Icons.bug_report),
+            onPressed: () {
+              print('=== AUDIO DEBUG INFO ===');
+              print('Audio paths: ${widget.audioPaths}');
+              for (int i = 0; i < widget.audioPaths.length; i++) {
+                print('  $i: ${widget.audioPaths[i]}');
+              }
+              print('=======================');
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Debug info printed to console')),
+              );
+            },
+            tooltip: 'Debug Info',
+          ),
+        ],
       ),
       body: Container(
         decoration: BoxDecoration(

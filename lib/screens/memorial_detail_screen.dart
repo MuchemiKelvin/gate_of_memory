@@ -203,14 +203,17 @@ class MemorialDetailScreen extends StatelessWidget {
             'Videos',
             Icons.videocam,
             Colors.red,
-            () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => VideosPage(
-                  videoPaths: [memorial.videoPath],
+            () {
+              print('Opening video page with paths: [${memorial.videoPath}]');
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => VideosPage(
+                    videoPaths: [memorial.videoPath],
+                  ),
                 ),
-              ),
-            ),
+              );
+            },
           ),
         if (memorial.audioPaths.isNotEmpty)
           _buildContentCard(
@@ -218,14 +221,17 @@ class MemorialDetailScreen extends StatelessWidget {
             'Audio',
             Icons.audiotrack,
             Colors.orange,
-            () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => AudioPage(
-                  audioPaths: memorial.audioPaths,
+            () {
+              print('Opening audio page with paths: ${memorial.audioPaths}');
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => AudioPage(
+                    audioPaths: memorial.audioPaths,
+                  ),
                 ),
-              ),
-            ),
+              );
+            },
           ),
         if (memorial.stories.isNotEmpty)
           _buildContentCard(
