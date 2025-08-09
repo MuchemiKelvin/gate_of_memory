@@ -162,9 +162,6 @@ class _ARCameraScreenState extends State<ARCameraScreen> {
   void _navigateToScreen(String screen, Map<String, dynamic>? arguments) {
     print('Navigating to: $screen with arguments: $arguments');
     
-    // Close the AR overlay first
-    _realARSessionManager.overlayService.clearOverlays();
-    
     // Get memorial ID from arguments
     final memorialId = arguments?['memorialId'] as String?;
     
@@ -176,7 +173,13 @@ class _ARCameraScreenState extends State<ARCameraScreen> {
           MaterialPageRoute(
             builder: (_) => ImagesPage(memorialId: memorialId),
           ),
-        );
+        ).then((_) {
+          // When returning from the content page, keep the AR overlay visible
+          // Only clear overlays if we're not in an active AR session
+          if (_realARSessionManager.sessionState != RealARSessionState.active) {
+            _realARSessionManager.overlayService.clearOverlays();
+          }
+        });
         break;
       case '/videos':
         Navigator.push(
@@ -184,7 +187,12 @@ class _ARCameraScreenState extends State<ARCameraScreen> {
           MaterialPageRoute(
             builder: (_) => VideosPage(memorialId: memorialId),
           ),
-        );
+        ).then((_) {
+          // When returning from the content page, keep the AR overlay visible
+          if (_realARSessionManager.sessionState != RealARSessionState.active) {
+            _realARSessionManager.overlayService.clearOverlays();
+          }
+        });
         break;
       case '/audio':
         Navigator.push(
@@ -192,7 +200,12 @@ class _ARCameraScreenState extends State<ARCameraScreen> {
           MaterialPageRoute(
             builder: (_) => AudioPage(memorialId: memorialId),
           ),
-        );
+        ).then((_) {
+          // When returning from the content page, keep the AR overlay visible
+          if (_realARSessionManager.sessionState != RealARSessionState.active) {
+            _realARSessionManager.overlayService.clearOverlays();
+          }
+        });
         break;
       case '/stories':
         Navigator.push(
@@ -200,10 +213,24 @@ class _ARCameraScreenState extends State<ARCameraScreen> {
           MaterialPageRoute(
             builder: (_) => StoriesPage(memorialId: memorialId),
           ),
-        );
+        ).then((_) {
+          // When returning from the content page, keep the AR overlay visible
+          if (_realARSessionManager.sessionState != RealARSessionState.active) {
+            _realARSessionManager.overlayService.clearOverlays();
+          }
+        });
         break;
       case '/memorial-details':
-        Navigator.pushNamed(context, '/memorial-details', arguments: arguments);
+        Navigator.pushNamed(context, '/memorial-details', arguments: arguments).then((_) {
+          // When returning from the content page, keep the AR overlay visible
+          if (_realARSessionManager.sessionState != RealARSessionState.active) {
+            _realARSessionManager.overlayService.clearOverlays();
+          }
+        });
+        break;
+      case '/close':
+        // Only clear overlays when explicitly closing
+        _realARSessionManager.overlayService.clearOverlays();
         break;
       default:
         print('Unknown screen: $screen');

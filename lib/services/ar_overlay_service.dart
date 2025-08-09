@@ -440,9 +440,13 @@ class AROverlayService {
         print('Tapped: $label');
         
         if (label == 'Close') {
-          // Close the overlay
+          // Close the overlay using navigation callback
           print('Closing overlay...');
-          clearOverlays();
+          if (_navigationCallback != null) {
+            _navigationCallback!('/close', null);
+          } else {
+            clearOverlays();
+          }
           return;
         }
         
