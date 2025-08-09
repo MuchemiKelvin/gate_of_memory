@@ -125,6 +125,37 @@ class _MemorialDashboardScreenState extends State<MemorialDashboardScreen> {
             onPressed: () => Navigator.of(context).pop(),
             child: const Text('OK'),
           ),
+          TextButton(
+            onPressed: () async {
+              Navigator.of(context).pop();
+              setState(() {
+                _isLoading = true;
+              });
+              try {
+                await _dbInitService.forceReseed();
+                await _loadData();
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Database re-seeded successfully.')),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Re-seed failed: $e')),
+                  );
+                }
+              } finally {
+                if (mounted) {
+                  setState(() {
+                    _isLoading = false;
+                  });
+                }
+              }
+            },
+            style: TextButton.styleFrom(foregroundColor: Colors.blue),
+            child: const Text('Reseed DB'),
+          ),
         ],
       ),
     );

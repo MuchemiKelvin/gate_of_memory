@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'dart:async';
+import 'real_qr_detection_service.dart';
 
 class RealCameraService {
   static final RealCameraService _instance = RealCameraService._internal();
@@ -18,6 +19,7 @@ class RealCameraService {
   double _zoomLevel = 1.0;
   bool _flashEnabled = false;
   bool _autoFocusEnabled = true;
+  DateTime? _lastFrameProcessedAt;
 
   // Stream controllers
   final StreamController<Map<String, dynamic>> _frameDataController = StreamController<Map<String, dynamic>>.broadcast();
@@ -179,6 +181,22 @@ class RealCameraService {
       };
 
       _frameDataController.add(frameData);
+
+      // Throttle and forward frames to QR detection service when active
+      final now = DateTime.now();
+      final shouldProcess = _lastFrameProcessedAt == null ||
+          now.difference(_lastFrameProcessedAt!).inMilliseconds > 150;
+      if (shouldProcess) {
+        _lastFrameProcessedAt = now;
+        try {
+          final qrService = RealQRDetectionService();
+          if (qrService.isInitialized && qrService.isDetecting) {
+            qrService.processFrame(image);
+          }
+        } catch (e) {
+          print('Error passing frame to QR detection: $e');
+        }
+      }
     } catch (e) {
       print('Error processing camera frame: $e');
     }

@@ -4,6 +4,7 @@ import '../models/memorial.dart';
 import '../models/media.dart';
 import 'database_helper.dart';
 import 'memorial_service.dart';
+import '../models/category.dart';
 
 class DatabaseInitService {
   final DatabaseHelper _dbHelper = DatabaseHelper();
@@ -61,6 +62,20 @@ class DatabaseInitService {
   Future<void> _seedInitialData() async {
     print('Seeding initial data...');
     
+    // Seed default categories if none exist
+    try {
+      final existingCategories = await _memorialService.getAllCategories();
+      if (existingCategories.isEmpty) {
+        print('No categories found. Seeding default categories...');
+        for (final category in PredefinedCategories.defaultCategories) {
+          await _memorialService.insertCategory(category);
+          print('Inserted category: ${category.name}');
+        }
+      }
+    } catch (e) {
+      print('Error seeding default categories: $e');
+    }
+
     // Check if we need to seed demo memorials
     final existingMemorials = await _memorialService.getAllMemorials();
     print('Existing memorials found: ${existingMemorials.length}');

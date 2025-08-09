@@ -142,7 +142,7 @@ class AROverlayControls extends StatelessWidget {
               // Show Hologram
               _buildControlButton(
                 onPressed: () {
-                  overlayService.showHologram('hologram_001');
+                  overlayService.showHologram('hologram_001', hologramPath: 'assets/animation/hologram.mp4');
                 },
                 icon: Icons.view_in_ar,
                 label: 'Hologram',

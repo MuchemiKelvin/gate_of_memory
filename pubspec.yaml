@@ -38,7 +38,6 @@ dependencies:
   geolocator: ^10.1.0
   geocoding: ^2.1.1
   device_info_plus: ^9.1.1
-  http: ^1.1.0
   vector_math: ^2.1.4
   camera: ^0.10.5+5
   permission_handler: ^11.0.1

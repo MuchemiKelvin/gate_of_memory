@@ -35,6 +35,10 @@ class DatabaseHelper {
     if (version >= 2) {
       await DatabaseMigrations.migrateToVersion2(db);
     }
+
+    if (version >= 3) {
+      await DatabaseMigrations.migrateToVersion3(db);
+    }
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {

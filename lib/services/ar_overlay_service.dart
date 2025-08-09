@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
+import 'package:video_player/video_player.dart';
 
 enum AROverlayType {
   marker,
@@ -151,11 +152,11 @@ class AROverlayService {
   }
 
   /// Show hologram overlay
-  void showHologram(String hologramId, {Offset? position, double? scale}) {
+  void showHologram(String hologramId, {String? hologramPath, Offset? position, double? scale}) {
     final overlay = AROverlay(
       id: 'hologram_$hologramId',
       type: AROverlayType.hologram,
-      widget: _buildHologramWidget(hologramId),
+      widget: _buildHologramWidget(hologramId, hologramPath: hologramPath),
       position: position ?? Offset.zero,
       scale: scale ?? 1.0,
     );
@@ -271,7 +272,7 @@ class AROverlayService {
   }
 
   /// Build hologram widget
-  Widget _buildHologramWidget(String hologramId) {
+  Widget _buildHologramWidget(String hologramId, {String? hologramPath}) {
     return SizedBox.expand(
       child: Container(
         decoration: BoxDecoration(
@@ -349,46 +350,9 @@ class AROverlayService {
                 padding: EdgeInsets.all(24),
                 child: Column(
                   children: [
-                    // Hologram preview area
-                    Container(
-                      height: 200,
-                      margin: EdgeInsets.only(bottom: 32),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            Color(0xFF7bb6e7).withOpacity(0.3),
-                            Color(0xFF7bb6e7).withOpacity(0.1),
-                          ],
-                        ),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: Color(0xFF7bb6e7).withOpacity(0.6),
-                          width: 3,
-                        ),
-                      ),
-                      child: Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.play_circle_outline,
-                              size: 80,
-                              color: Color(0xFF7bb6e7),
-                            ),
-                            SizedBox(height: 16),
-                            Text(
-                              'Hologram Preview',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 18,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                    // Hologram preview area (video-based MVP)
+                    _HologramVideoPreview(
+                      hologramPath: hologramPath,
                     ),
                     
                     // Interactive content buttons
@@ -676,3 +640,82 @@ class AROverlayService {
     print('AR overlay service disposed');
   }
 } 
+
+/// Simple video preview for hologram MVP
+class _HologramVideoPreview extends StatefulWidget {
+  final String? hologramPath;
+  const _HologramVideoPreview({this.hologramPath});
+
+  @override
+  State<_HologramVideoPreview> createState() => _HologramVideoPreviewState();
+}
+
+class _HologramVideoPreviewState extends State<_HologramVideoPreview> {
+  VideoPlayerController? _controller;
+  bool _initialized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.hologramPath != null && widget.hologramPath!.isNotEmpty) {
+      _controller = VideoPlayerController.asset(widget.hologramPath!)
+        ..initialize().then((_) {
+          if (mounted) {
+            setState(() => _initialized = true);
+            _controller!..setLooping(true)..play();
+          }
+        });
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 220,
+      margin: EdgeInsets.only(bottom: 32),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFF7bb6e7).withOpacity(0.3),
+            Color(0xFF7bb6e7).withOpacity(0.1),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: Color(0xFF7bb6e7).withOpacity(0.6),
+          width: 3,
+        ),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: _initialized && _controller != null
+            ? FittedBox(
+                fit: BoxFit.cover,
+                child: SizedBox(
+                  width: _controller!.value.size.width,
+                  height: _controller!.value.size.height,
+                  child: VideoPlayer(_controller!),
+                ),
+              )
+            : Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.play_circle_outline, size: 80, color: Color(0xFF7bb6e7)),
+                    SizedBox(height: 12),
+                    Text('Hologram Preview', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
+      ),
+    );
+  }
+}

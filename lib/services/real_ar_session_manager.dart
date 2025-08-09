@@ -242,9 +242,9 @@ class RealARSessionManager {
           'scale': 1.0,
         });
 
-        // Clear previous overlays and show the new content
+        // Clear previous overlays and show the new content (video-based MVP)
         _overlayService.clearOverlays();
-        _overlayService.showHologram(markerId);
+        _overlayService.showHologram(markerId, hologramPath: content.hologramPath);
         
         // Add a small delay before showing the info message to prevent interference
         await Future.delayed(Duration(milliseconds: 100));

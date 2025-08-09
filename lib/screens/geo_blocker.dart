@@ -41,7 +41,7 @@ class _GeoBlockerState extends State<GeoBlocker> {
       setState(() {
         _allowed = result.isAllowed;
         _detectedCountry = result.latitude != null && result.longitude != null
-          ? 'Lat:  {result.latitude!.toStringAsFixed(4)}, Lon:  {result.longitude!.toStringAsFixed(4)}'
+          ? 'Lat: ${result.latitude!.toStringAsFixed(4)}, Lon: ${result.longitude!.toStringAsFixed(4)}'
           : null;
         _detectedCity = null;
         _locationMethods = [];
@@ -119,7 +119,7 @@ class _GeoBlockerState extends State<GeoBlocker> {
       );
     } else {
       String countryMsg = _detectedCountry != null && _detectedCountry!.isNotEmpty
-        ? 'Your coordinates:  {_detectedCountry!}. This app is restricted to users within Kenya.'
+        ? 'Your coordinates: ${_detectedCountry!}. This app is restricted to users within Kenya.'
         : 'This app is restricted to users within Kenya.';
       
       return _GeoBlockerScaffold(
