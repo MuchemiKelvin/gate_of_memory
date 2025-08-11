@@ -43,6 +43,10 @@ dependencies:
   permission_handler: ^11.0.1
   qr_flutter: ^4.1.0
   mobile_scanner: ^7.0.1
+  # Phase 1: HTTP Dependencies for Backend Integration
+  http: ^1.1.0
+  connectivity_plus: ^5.0.0
+  shared_preferences: ^2.2.0
 
 dev_dependencies:
   flutter_test:
