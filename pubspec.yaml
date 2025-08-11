@@ -47,6 +47,8 @@ dependencies:
   http: ^1.1.0
   connectivity_plus: ^5.0.0
   shared_preferences: ^2.2.0
+  # Phase 3: Template Storage Dependencies
+  path_provider: ^2.1.1
 
 dev_dependencies:
   flutter_test:
