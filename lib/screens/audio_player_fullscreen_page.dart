@@ -199,6 +199,19 @@ class _AudioPlayerFullscreenPageState extends State<AudioPlayerFullscreenPage> {
     });
   }
 
+  String _getAudioTitle() {
+    final fileName = widget.audioPath.split('/').last;
+    final nameWithoutExtension = fileName.split('.').first;
+    return nameWithoutExtension
+        .split('_')
+        .map((word) => word.isNotEmpty ? word[0].toUpperCase() + word.substring(1) : '')
+        .join(' ');
+  }
+
+  String _getAudioSubtitle() {
+    return '${_formatDuration(_duration)} • ${_getFileSize()}';
+  }
+
   String _getFileSize() {
     // Estimate file size based on duration (rough estimate)
     final sizeInMB = (_duration.inSeconds * 0.128).toStringAsFixed(1); // 128kbps estimate
@@ -533,7 +546,7 @@ class _AudioPlayerFullscreenPageState extends State<AudioPlayerFullscreenPage> {
           child: Column(
             children: [
               Text(
-                _audioInfo.split('\n')[0], // Title
+                _getAudioTitle(),
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
@@ -543,7 +556,7 @@ class _AudioPlayerFullscreenPageState extends State<AudioPlayerFullscreenPage> {
               ),
               SizedBox(height: 8),
               Text(
-                _audioInfo.split('\n')[1], // Duration and file size
+                _getAudioSubtitle(),
                 style: TextStyle(
                   fontSize: 16,
                   color: Color(0xFF4a5a6a),

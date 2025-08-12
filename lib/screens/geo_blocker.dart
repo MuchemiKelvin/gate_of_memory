@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import '../services/location_service.dart';
 import 'package:flutter/services.dart';
-import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart' show kIsWeb;
 
 class GeoBlocker extends StatefulWidget {
   final Widget child;
-  const GeoBlocker({required this.child});
+  const GeoBlocker({Key? key, required this.child}) : super(key: key);
 
   @override
   State<GeoBlocker> createState() => _GeoBlockerState();
@@ -16,7 +15,6 @@ class _GeoBlockerState extends State<GeoBlocker> {
   bool? _allowed;
   String? _fallbackMessage;
   String? _detectedCountry;
-  String? _detectedCity;
   bool _isLoading = true;
   bool _isRetrying = false;
   LocationStatus _locationStatus = LocationStatus.checking;
@@ -43,7 +41,6 @@ class _GeoBlockerState extends State<GeoBlocker> {
         _detectedCountry = result.latitude != null && result.longitude != null
           ? 'Lat: ${result.latitude!.toStringAsFixed(4)}, Lon: ${result.longitude!.toStringAsFixed(4)}'
           : null;
-        _detectedCity = null;
         _locationMethods = [];
         _isLoading = false;
         
@@ -78,19 +75,7 @@ class _GeoBlockerState extends State<GeoBlocker> {
     });
   }
 
-  Future<void> _openLocationSettings() async {
-    try {
-      await LocationService.openLocationSettings();
-    } catch (e) {
-      // Handle case where settings can't be opened
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Please enable location services in your device settings.'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-    }
-  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -109,10 +94,9 @@ class _GeoBlockerState extends State<GeoBlocker> {
           secondaryButtonText: 'Location Settings',
           onButton: _retryLocationCheck,
           onSecondaryButton: () {
-            // Use a post-frame callback to ensure we're in the correct context
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              Navigator.of(context).pushNamed('/location-settings');
-            });
+            // For location settings, we'll just retry the location check
+            // since we can't navigate from this context
+            _retryLocationCheck();
           },
           isRetrying: _isRetrying,
         ),
@@ -130,20 +114,8 @@ class _GeoBlockerState extends State<GeoBlocker> {
           secondaryButtonText: 'Retry',
           onButton: () async {
             if (kIsWeb) {
-              // On web, show a goodbye dialog
-              showDialog(
-                context: context,
-                builder: (context) => AlertDialog(
-                  title: Text('Goodbye!'),
-                  content: Text('Thank you for using Gate of Memory.'),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      child: Text('Close'),
-                    ),
-                  ],
-                ),
-              );
+              // On web, just retry since we can't show dialogs from this context
+              _retryLocationCheck();
             } else {
               // On mobile/desktop, close the app
               await SystemNavigator.pop();
@@ -228,23 +200,26 @@ class _GeoBlockerScaffold extends StatelessWidget {
   const _GeoBlockerScaffold({required this.child});
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              Color(0xFFeaf3fa),
-              Color(0xFFc7e0f5),
-              Color(0xFF7bb6e7),
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: Container(
+          width: double.infinity,
+          height: double.infinity,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                Color(0xFFeaf3fa),
+                Color(0xFFc7e0f5),
+                Color(0xFF7bb6e7),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
           ),
+          child: child,
         ),
-        child: child,
       ),
     );
   }
@@ -275,124 +250,80 @@ class _GeoBlockerDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: SingleChildScrollView(
-        child: Card(
-          elevation: 8,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-          color: Colors.white.withOpacity(0.97),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 32),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  title.contains('Denied') ? Icons.location_off : Icons.location_on,
-                  color: Color(0xFF7bb6e7),
-                  size: 48,
-                ),
-                SizedBox(height: 24),
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF2d3a4a),
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                SizedBox(height: 16),
-                Text(
-                  message,
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Color(0xFF4a5a6a),
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                if (showLocationMethods && locationMethods.isNotEmpty) ...[
-                  SizedBox(height: 24),
-                  Container(
-                    padding: EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Color(0xFFf8f9fa),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Color(0xFFe9ecef)),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Location Detection Methods:',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF2d3a4a),
-                          ),
-                        ),
-                        SizedBox(height: 8),
-                        ...locationMethods.map((method) => Padding(
-                          padding: EdgeInsets.only(bottom: 4),
-                          child: Text(
-                            '• $method',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Color(0xFF6c757d),
-                            ),
-                          ),
-                        )).toList(),
-                      ],
-                    ),
-                  ),
-                ],
-                SizedBox(height: 32),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    if (secondaryButtonText != null) ...[
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: isRetrying ? null : onSecondaryButton,
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: Color(0xFF7bb6e7),
-                            side: BorderSide(color: Color(0xFF7bb6e7)),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            padding: EdgeInsets.symmetric(vertical: 16),
-                          ),
-                          child: Text(secondaryButtonText!),
-                        ),
-                      ),
-                      SizedBox(width: 16),
-                    ],
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: isRetrying ? null : onButton,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Color(0xFF7bb6e7),
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          padding: EdgeInsets.symmetric(vertical: 16),
-                        ),
-                        child: isRetrying
-                            ? SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                ),
-                              )
-                            : Text(buttonText),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              title.contains('Denied') ? Icons.location_off : Icons.location_on,
+              color: Color(0xFF7bb6e7),
+              size: 48,
             ),
-          ),
+            SizedBox(height: 24),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF2d3a4a),
+              ),
+              textAlign: TextAlign.center,
+            ),
+            SizedBox(height: 16),
+            Text(
+              message,
+              style: TextStyle(
+                fontSize: 16,
+                color: Color(0xFF4a5a6a),
+              ),
+              textAlign: TextAlign.center,
+            ),
+            SizedBox(height: 32),
+            if (secondaryButtonText != null) ...[
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  onPressed: isRetrying ? null : onSecondaryButton,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Color(0xFF7bb6e7),
+                    side: BorderSide(color: Color(0xFF7bb6e7)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    padding: EdgeInsets.symmetric(vertical: 16),
+                  ),
+                  child: Text(secondaryButtonText!),
+                ),
+              ),
+              SizedBox(height: 16),
+            ],
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: isRetrying ? null : onButton,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Color(0xFF7bb6e7),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  padding: EdgeInsets.symmetric(vertical: 16),
+                ),
+                child: isRetrying
+                    ? SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
+                    : Text(buttonText),
+              ),
+            ),
+          ],
         ),
       ),
     );

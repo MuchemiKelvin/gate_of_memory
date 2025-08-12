@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
-import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'dart:async';
 
 class HologramPlayerFullscreenPage extends StatefulWidget {
@@ -18,6 +18,7 @@ class _HologramPlayerFullscreenPageState extends State<HologramPlayerFullscreenP
   bool _isInitialized = false;
   bool _hasError = false;
   String _errorMessage = '';
+  bool _isWindows = false;
   
   // Hologram-specific features
   double _rotationAngle = 0.0;
@@ -25,7 +26,6 @@ class _HologramPlayerFullscreenPageState extends State<HologramPlayerFullscreenP
   bool _autoRotate = false;
   double _rotationSpeed = 1.0;
   bool _isLooping = false;
-  String _hologramInfo = '';
   
   // Advanced positioning features
   Offset _position = Offset.zero;
@@ -53,64 +53,62 @@ class _HologramPlayerFullscreenPageState extends State<HologramPlayerFullscreenP
   Future<void> _initializeHologramPlayer() async {
     try {
       print('Initializing hologram player with path: ${widget.hologramPath}');
-      
+
       // Clean the hologram path
       String cleanPath = widget.hologramPath;
       if (cleanPath.startsWith('assets/assets/')) {
         cleanPath = cleanPath.replaceFirst('assets/assets/', 'assets/');
         print('Fixed path from ${widget.hologramPath} to $cleanPath');
       }
-      
-      // Check if we're on Windows and provide a fallback
-      if (Platform.isWindows) {
-        print('Running on Windows - using fallback hologram player');
+
+      // Check if we're on web platform
+      if (kIsWeb) {
+        print('Web platform detected - using fallback hologram player');
         setState(() {
           _hasError = true;
-          _errorMessage = 'Hologram playback is not supported on Windows yet. Hologram path: ${widget.hologramPath}';
+          _errorMessage = 'Hologram playback is not supported on web platform yet. Hologram path: ${widget.hologramPath}';
         });
         return;
       }
       
-      _controller = VideoPlayerController.asset(cleanPath);
+      // For mobile and desktop platforms, try to initialize hologram player
+      print('Mobile/Desktop platform detected - initializing hologram player');
       
-      await _controller!.initialize();
-      print('Hologram controller initialized successfully');
-      
-      // Set up listeners
-      _controller!.addListener(() {
+      try {
+        _controller = VideoPlayerController.asset(cleanPath);
+        await _controller!.initialize();
+        
         setState(() {
-          _updateHologramInfo();
+          _isInitialized = true;
+          _hasError = false;
+          _isWindows = false; // Not Windows if we got here
         });
-      });
-      
-      setState(() {
-        _isInitialized = true;
-        _updateHologramInfo();
-      });
-      print('Hologram player initialized successfully');
-      
-      // Auto-start hologram for testing
-      await _autoStartHologram();
-      
+        
+        print('✓ Hologram player initialized successfully');
+      } catch (e) {
+        print('❌ Video player initialization failed: $e');
+        // If video player fails, show Windows fallback
+        setState(() {
+          _isWindows = true;
+          _hasError = false;
+          _errorMessage = '';
+        });
+        print('Falling back to Windows interface due to video player failure');
+      }
     } catch (e) {
-      print('Error initializing hologram player: $e');
+      print('❌ Error initializing hologram player: $e');
       setState(() {
         _hasError = true;
-        _errorMessage = 'Failed to load hologram: $e';
+        _errorMessage = 'Failed to initialize hologram player: $e';
       });
     }
   }
 
   void _updateHologramInfo() {
-    final fileName = widget.hologramPath.split('/').last;
-    final nameWithoutExtension = fileName.split('.').first;
-    final readableTitle = nameWithoutExtension
-        .split('_')
-        .map((word) => word[0].toUpperCase() + word.substring(1))
-        .join(' ');
-    
+    // This method is no longer needed since we're using helper methods
+    // But keeping it for backward compatibility in case it's called elsewhere
     setState(() {
-      _hologramInfo = '${readableTitle}\nHologram • 360° View • ${_getFileSize()}';
+      // Trigger a rebuild to update the display
     });
   }
 
@@ -449,6 +447,20 @@ class _HologramPlayerFullscreenPageState extends State<HologramPlayerFullscreenP
     return '$minutes:$seconds';
   }
 
+  String _getHologramTitle() {
+    final fileName = widget.hologramPath.split('/').last;
+    final nameWithoutExtension = fileName.split('.').first;
+    final readableTitle = nameWithoutExtension
+        .split('_')
+        .map((word) => word[0].toUpperCase() + word.substring(1))
+        .join(' ');
+    return readableTitle;
+  }
+
+  String _getHologramSubtitle() {
+    return 'Hologram • 360° View • ${_getFileSize()}';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -491,9 +503,11 @@ class _HologramPlayerFullscreenPageState extends State<HologramPlayerFullscreenP
         ),
         child: _hasError
             ? _buildErrorWidget()
-            : _isInitialized
-                ? _buildHologramPlayer()
-                : _buildLoadingWidget(),
+            : _isWindows
+                ? _buildWindowsFallbackWidget()
+                : _isInitialized
+                    ? _buildHologramPlayer()
+                    : _buildLoadingWidget(),
       ),
     );
   }
@@ -548,6 +562,52 @@ class _HologramPlayerFullscreenPageState extends State<HologramPlayerFullscreenP
     );
   }
 
+  Widget _buildWindowsFallbackWidget() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.view_in_ar,
+            size: 100,
+            color: Colors.white54,
+          ),
+          SizedBox(height: 20),
+          Text(
+            'Hologram Playback Not Supported on Windows',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          SizedBox(height: 10),
+          Text(
+            'This application does not support playing 360° holograms directly on Windows. Please use a platform that supports video playback, such as a web browser or a mobile device.',
+            style: TextStyle(
+              fontSize: 16,
+              color: Colors.white70,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          SizedBox(height: 20),
+          ElevatedButton.icon(
+            onPressed: () {
+              Navigator.pop(context);
+            },
+            icon: Icon(Icons.arrow_back),
+            label: Text('Back to Gallery'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Color(0xFF7bb6e7),
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildHologramPlayer() {
     return Column(
       children: [
@@ -557,7 +617,7 @@ class _HologramPlayerFullscreenPageState extends State<HologramPlayerFullscreenP
           child: Column(
             children: [
               Text(
-                _hologramInfo.split('\n')[0], // Title
+                _getHologramTitle(),
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
@@ -567,7 +627,7 @@ class _HologramPlayerFullscreenPageState extends State<HologramPlayerFullscreenP
               ),
               SizedBox(height: 4),
               Text(
-                _hologramInfo.split('\n')[1], // Info
+                _getHologramSubtitle(),
                 style: TextStyle(
                   fontSize: 14,
                   color: Colors.white70,

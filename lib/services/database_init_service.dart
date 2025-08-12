@@ -5,27 +5,40 @@ import '../models/media.dart';
 import 'database_helper.dart';
 import 'memorial_service.dart';
 import '../models/category.dart';
+import 'package:flutter/foundation.dart';
+import 'web_storage_service.dart';
 
 class DatabaseInitService {
   final DatabaseHelper _dbHelper = DatabaseHelper();
   final MemorialService _memorialService = MemorialService();
+  final WebStorageService _webStorage = WebStorageService.instance;
 
   // Initialize the complete database system
   Future<void> initializeDatabase() async {
     try {
       print('Starting database initialization...');
       
-      // Get database instance (this will trigger migrations if needed)
-      final db = await _dbHelper.database;
-      
-      // Check migration status
-      await DatabaseMigrations.getMigrationStatus(db);
-      
-      // Validate database integrity
-      await _validateDatabaseIntegrity(db);
-      
-      // Seed initial data if needed
-      await _seedInitialData();
+      if (kIsWeb) {
+        // Use web storage for web platform
+        print('Web platform detected, using web storage service');
+        await _webStorage.initialize();
+        print('Web storage initialized successfully');
+      } else {
+        // Use SQLite for mobile/desktop platforms
+        print('Native platform detected, using SQLite database');
+        
+        // Get database instance (this will trigger migrations if needed)
+        final db = await _dbHelper.database;
+        
+        // Check migration status
+        await DatabaseMigrations.getMigrationStatus(db);
+        
+        // Validate database integrity
+        await _validateDatabaseIntegrity(db);
+        
+        // Seed initial data if needed
+        await _seedInitialData();
+      }
       
       print('Database initialization completed successfully');
     } catch (e) {
@@ -354,24 +367,54 @@ class DatabaseInitService {
 
   // Get database statistics
   Future<Map<String, dynamic>> getDatabaseStatistics() async {
-    final db = await _dbHelper.database;
-    await DatabaseMigrations.getMigrationStatus(db);
-    final memorialStats = await _memorialService.getMemorialStatistics();
-    
-    return {
-      ...memorialStats,
-      'databasePath': db.path,
-      'databaseVersion': await db.getVersion(),
-    };
+    if (kIsWeb) {
+      // Return web storage statistics
+      return _webStorage.getDatabaseStatistics();
+    } else {
+      // Return SQLite database statistics
+      final db = await _dbHelper.database;
+      await DatabaseMigrations.getMigrationStatus(db);
+      final memorialStats = await _memorialService.getMemorialStatistics();
+      
+      return {
+        ...memorialStats,
+        'databasePath': db.path,
+        'databaseVersion': await db.getVersion(),
+      };
+    }
   }
 
   // Reset database (for development/testing)
   Future<void> resetDatabase() async {
     print('Resetting database...');
-    await _dbHelper.close();
-    DatabaseHelper.resetInstance();
-    await initializeDatabase();
-    print('Database reset completed');
+    
+    try {
+      if (kIsWeb) {
+        // Reset web storage
+        print('Web platform detected, resetting web storage');
+        await _webStorage.resetDatabase();
+      } else {
+        // Reset SQLite database
+        print('Native platform detected, resetting SQLite database');
+        
+        print('Step 1: Closing existing database connection...');
+        // Close existing database connection
+        await _dbHelper.close();
+        DatabaseHelper.resetInstance();
+        print('✓ Database connection closed and instance reset');
+        
+        print('Step 2: Re-initializing database system...');
+        // Re-initialize the database system (not the platform factory)
+        await initializeDatabase();
+        print('✓ Database system re-initialized');
+      }
+      
+      print('✓ Database reset completed successfully');
+    } catch (e, stackTrace) {
+      print('❌ Error during database reset: $e');
+      print('Stack trace: $stackTrace');
+      rethrow;
+    }
   }
 
   // Backup database

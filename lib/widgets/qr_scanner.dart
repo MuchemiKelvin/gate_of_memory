@@ -12,6 +12,7 @@ class QrScanner extends StatefulWidget {
 
 class _QrScannerState extends State<QrScanner> {
   bool _flashOn = false;
+  bool _hasDetected = false;
   final MobileScannerController _controller = MobileScannerController();
 
   void _toggleFlash() async {
@@ -20,6 +21,13 @@ class _QrScannerState extends State<QrScanner> {
     setState(() {
       _flashOn = enabled;
     });
+  }
+
+  void _resetScanner() {
+    setState(() {
+      _hasDetected = false;
+    });
+    _controller.start();
   }
 
   @override
@@ -40,11 +48,21 @@ class _QrScannerState extends State<QrScanner> {
             child: MobileScanner(
               controller: _controller,
               onDetect: (capture) {
+                if (_hasDetected) return; // Prevent multiple detections
+                
                 print('Detected: ${capture.barcodes}');
                 final barcodes = capture.barcodes;
                 if (barcodes.isNotEmpty) {
                   final String? code = barcodes.first.rawValue;
                   if (code != null) {
+                    setState(() {
+                      _hasDetected = true;
+                    });
+                    
+                    // Stop scanning temporarily
+                    _controller.stop();
+                    
+                    // Call the detection callback
                     widget.onDetect(code);
                   }
                 }
@@ -59,7 +77,10 @@ class _QrScannerState extends State<QrScanner> {
               width: 240,
               height: 240,
               decoration: BoxDecoration(
-                border: Border.all(color: Colors.white, width: 3),
+                border: Border.all(
+                  color: _hasDetected ? Colors.green : Colors.white, 
+                  width: 3
+                ),
                 borderRadius: BorderRadius.circular(16),
                 color: Colors.transparent,
                 boxShadow: [
@@ -91,6 +112,25 @@ class _QrScannerState extends State<QrScanner> {
             onPressed: _toggleFlash,
           ),
         ),
+        // Reset scanner button (shown after detection)
+        if (_hasDetected)
+          Positioned(
+            top: 24,
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green[600],
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                elevation: 4,
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              ),
+              icon: Icon(Icons.refresh, size: 20),
+              label: Text('Scan Again'),
+              onPressed: _resetScanner,
+            ),
+          ),
       ],
     );
   }

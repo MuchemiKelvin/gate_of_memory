@@ -39,9 +39,9 @@ class _VideosPageState extends State<VideosPage> {
       final memorialService = MemorialService();
       final memorials = await memorialService.getAllMemorials();
       
-      // Find memorial by QR code
+      // Find memorial by ID
       final foundMemorial = memorials.firstWhere(
-        (m) => m.qrCode == widget.memorialId,
+        (m) => m.id.toString() == widget.memorialId,
         orElse: () => throw Exception('Memorial not found'),
       );
 
@@ -59,11 +59,19 @@ class _VideosPageState extends State<VideosPage> {
   }
 
   void _openVideoPlayer(int index) {
+    // Extract a readable title from the video path
+    String videoPath = videoPaths[index];
+    String fileName = videoPath.split('/').last;
+    String title = fileName.replaceAll('.mp4', '').replaceAll('_', ' ').split(' ').map((word) => 
+      word.isNotEmpty ? word[0].toUpperCase() + word.substring(1) : ''
+    ).join(' ');
+    
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => VideoPlayerFullscreenPage(
-          videoPath: videoPaths[index],
+          videoPath: videoPath,
+          title: title,
         ),
       ),
     );

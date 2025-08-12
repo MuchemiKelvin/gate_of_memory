@@ -1,58 +1,67 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'screens/start_screen.dart';
 import 'screens/museum_screen.dart';
 import 'screens/memorial_dashboard_screen.dart';
 import 'screens/location_settings_screen.dart';
 import 'screens/location_debug_screen.dart';
-import 'screens/geo_blocker.dart';
 import 'screens/ar_camera_screen.dart';
-import 'screens/images_page.dart';
-import 'screens/videos_page.dart';
-import 'screens/audio_page.dart';
-import 'screens/stories_page.dart';
 import 'screens/memorial_details_page.dart';
-
+import 'screens/geo_blocker.dart';
 import 'services/database_init_service.dart';
-
-// Conditional import for desktop platforms only
-import 'database_initializer.dart' if (dart.library.html) 'database_initializer_web.dart';
+import 'database_initializer.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Initialize database based on platform
-  await initializeDatabase();
-  
-  // Test database initialization
   try {
-    print('=== TESTING DATABASE INITIALIZATION ===');
+    print('=== STARTING DATABASE INITIALIZATION ===');
+    
+    // Step 1: Initialize platform-specific database factory
+    print('Step 1: Initializing platform-specific database factory...');
+    await initializeDatabase();
+    print('✓ Platform-specific database factory initialization completed');
+    
+    // Step 2: Initialize database system and seed data
+    print('Step 2: Initializing database system...');
     final dbInitService = DatabaseInitService();
+    await dbInitService.initializeDatabase();
+    print('✓ Database system initialized and seeded');
+    
+    // Step 3: Test database functionality
+    print('Step 3: Testing database functionality...');
     final stats = await dbInitService.getDatabaseStatistics();
-    print('Database statistics: $stats');
-    print('=== END DATABASE TEST ===');
-  } catch (e) {
-    print('Database test error: $e');
+    print('✓ Database statistics: $stats');
+    
+    print('=== DATABASE INITIALIZATION COMPLETED SUCCESSFULLY ===');
+  } catch (e, stackTrace) {
+    print('❌ CRITICAL ERROR during database initialization: $e');
+    print('Stack trace: $stackTrace');
+    
+    // Show error dialog or fallback behavior
+    print('Continuing with app launch despite database error...');
   }
-  
-  runApp(
-    MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'Kardiverse Mobile',
-      initialRoute: '/',
-      builder: (context, child) => GeoBlocker(child: child ?? Container()),
-      routes: {
-        '/': (context) => StartScreen(),
-        '/museum': (context) => MuseumScreen(imageAssets: [
-          'assets/images/memorial_card.jpeg',
-        ]),
-        '/dashboard': (context) => const MemorialDashboardScreen(),
-        '/location-settings': (context) => LocationSettingsScreen(),
-        '/location-debug': (context) => LocationDebugScreen(),
-        '/ar-camera': (context) => ARCameraScreen(),
-        '/memorial-details': (context) => MemorialDetailsPage(),
 
-      },
+  // Start the app with GeoBlocker for location verification
+  runApp(
+    GeoBlocker(
+      child: MaterialApp(
+        debugShowCheckedModeBanner: false,
+        title: 'Kardiverse Mobile',
+        initialRoute: '/',
+        routes: {
+          '/': (context) => StartScreen(),
+          '/museum': (context) => MuseumScreen(imageAssets: [
+            'assets/images/memorial_card.jpeg',
+          ]),
+          '/dashboard': (context) => const MemorialDashboardScreen(),
+          '/location-settings': (context) => LocationSettingsScreen(),
+          '/location-debug': (context) => LocationDebugScreen(),
+          '/ar-camera': (context) => ARCameraScreen(),
+          '/memorial-details': (context) => MemorialDetailsPage(),
+        },
+      ),
     ),
   );
 }
+
+

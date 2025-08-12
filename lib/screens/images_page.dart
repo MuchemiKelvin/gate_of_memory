@@ -39,9 +39,9 @@ class _ImagesPageState extends State<ImagesPage> {
       final memorialService = MemorialService();
       final memorials = await memorialService.getAllMemorials();
       
-      // Find memorial by QR code
+      // Find memorial by ID
       final foundMemorial = memorials.firstWhere(
-        (m) => m.qrCode == widget.memorialId,
+        (m) => m.id.toString() == widget.memorialId,
         orElse: () => throw Exception('Memorial not found'),
       );
 

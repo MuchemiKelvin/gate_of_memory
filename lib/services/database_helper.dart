@@ -1,6 +1,7 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import '../database/migrations.dart';
+import 'package:flutter/foundation.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper _instance = DatabaseHelper._internal();
@@ -16,13 +17,25 @@ class DatabaseHelper {
   }
 
   Future<Database> _initDatabase() async {
-    String path = join(await getDatabasesPath(), 'kardiverse_mobile.db');
-    return await openDatabase(
-      path,
-      version: DatabaseMigrations.currentVersion,
-      onCreate: _onCreate,
-      onUpgrade: _onUpgrade,
-    );
+    try {
+      // Check if we're on web platform
+      if (kIsWeb) {
+        throw UnsupportedError('SQLite database is not supported on web platform. Use web storage instead.');
+      }
+      
+      String path = join(await getDatabasesPath(), 'kardiverse_mobile.db');
+      print('Initializing database at: $path');
+      
+      return await openDatabase(
+        path,
+        version: DatabaseMigrations.currentVersion,
+        onCreate: _onCreate,
+        onUpgrade: _onUpgrade,
+      );
+    } catch (e) {
+      print('❌ Error initializing database: $e');
+      rethrow;
+    }
   }
 
   Future<void> _onCreate(Database db, int version) async {

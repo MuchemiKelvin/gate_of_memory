@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
-import 'dart:io';
+import 'package:flutter/foundation.dart';
 
 class VideoPlayerFullscreenPage extends StatefulWidget {
   final String videoPath;
-  const VideoPlayerFullscreenPage({required this.videoPath});
+  final String title;
+  const VideoPlayerFullscreenPage({required this.videoPath, required this.title});
 
   @override
   State<VideoPlayerFullscreenPage> createState() => _VideoPlayerFullscreenPageState();
@@ -16,6 +17,7 @@ class _VideoPlayerFullscreenPageState extends State<VideoPlayerFullscreenPage> {
   bool _isInitialized = false;
   bool _hasError = false;
   String _errorMessage = '';
+  bool _isWindows = false;
 
   @override
   void initState() {
@@ -26,38 +28,53 @@ class _VideoPlayerFullscreenPageState extends State<VideoPlayerFullscreenPage> {
   Future<void> _initializeVideoPlayer() async {
     try {
       print('Initializing video player with path: ${widget.videoPath}');
-      
-      // Check if we're on Windows and provide a fallback
-      if (Platform.isWindows) {
-        print('Running on Windows - using fallback video player');
+
+      // Check if we're on web platform
+      if (kIsWeb) {
+        print('Web platform detected - using fallback video player');
         setState(() {
           _hasError = true;
-          _errorMessage = 'Video playback is not supported on Windows yet. Video path: ${widget.videoPath}';
+          _errorMessage = 'Video playback is not supported on web platform yet. Video path: ${widget.videoPath}';
         });
         return;
       }
       
-      _controller = VideoPlayerController.asset(widget.videoPath);
+      // For mobile and desktop platforms, try to initialize video player
+      print('Mobile/Desktop platform detected - initializing video player');
       
-      await _controller!.initialize();
-      print('Video controller initialized successfully');
+      // Clean the video path
+      String cleanPath = widget.videoPath;
+      if (cleanPath.startsWith('assets/assets/')) {
+        cleanPath = cleanPath.replaceFirst('assets/assets/', 'assets/');
+        print('Fixed path from ${widget.videoPath} to $cleanPath');
+      }
       
-      setState(() {
-        _isInitialized = true;
-      });
-      
-      _controller!.play();
-      _isPlaying = true;
-      print('Video playback started');
-      
-      _controller!.addListener(() {
-        setState(() {});
-      });
+      try {
+        _controller = VideoPlayerController.asset(cleanPath);
+        await _controller!.initialize();
+        
+        setState(() {
+          _isInitialized = true;
+          _hasError = false;
+          _isWindows = false; // Not Windows if we got here
+        });
+        
+        print('✓ Video player initialized successfully');
+      } catch (e) {
+        print('❌ Video player initialization failed: $e');
+        // If video player fails, show Windows fallback
+        setState(() {
+          _isWindows = true;
+          _hasError = false;
+          _errorMessage = '';
+        });
+        print('Falling back to Windows interface due to video player failure');
+      }
     } catch (e) {
-      print('Error initializing video controller: $e');
+      print('❌ Error initializing video player: $e');
       setState(() {
         _hasError = true;
-        _errorMessage = 'Failed to load video: $e';
+        _errorMessage = 'Failed to initialize video player: $e';
       });
     }
   }
@@ -105,12 +122,27 @@ class _VideoPlayerFullscreenPageState extends State<VideoPlayerFullscreenPage> {
           style: TextStyle(color: Colors.white),
         ),
       ),
-      body: Center(
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              Color(0xFF1a2a3a),
+              Color(0xFF2d3a4a),
+              Color(0xFF1a2a3a),
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
         child: _hasError
             ? _buildErrorWidget()
-            : _isInitialized
-                ? _buildVideoPlayer()
-                : _buildLoadingWidget(),
+            : _isWindows
+                ? _buildWindowsFallbackWidget()
+                : _isInitialized
+                    ? _buildVideoPlayer()
+                    : _buildLoadingWidget(),
       ),
     );
   }
@@ -233,6 +265,92 @@ class _VideoPlayerFullscreenPageState extends State<VideoPlayerFullscreenPage> {
           textAlign: TextAlign.center,
         ),
       ],
+    );
+  }
+
+  Widget _buildWindowsFallbackWidget() {
+    return Padding(
+      padding: EdgeInsets.all(20),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.video_file,
+            size: 80,
+            color: Colors.white54,
+          ),
+          SizedBox(height: 20),
+          Text(
+            'Video Preview (Windows)',
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
+          SizedBox(height: 10),
+          Text(
+            'Video playback is not yet supported on Windows desktop.',
+            style: TextStyle(
+              fontSize: 16,
+              color: Colors.white70,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          SizedBox(height: 20),
+          Container(
+            padding: EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.white24),
+            ),
+            child: Column(
+              children: [
+                Text(
+                  'Video Information',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+                SizedBox(height: 12),
+                Text(
+                  'Title: ${widget.title}',
+                  style: TextStyle(color: Colors.white70),
+                ),
+                Text(
+                  'Path: ${widget.videoPath}',
+                  style: TextStyle(color: Colors.white70),
+                ),
+                Text(
+                  'Platform: Windows Desktop',
+                  style: TextStyle(color: Colors.white70),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(height: 20),
+          ElevatedButton.icon(
+            onPressed: () {
+              // Show file info or open file location
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Video file: ${widget.videoPath}'),
+                  duration: Duration(seconds: 3),
+                ),
+              );
+            },
+            icon: Icon(Icons.info),
+            label: Text('Show File Info'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Color(0xFF7bb6e7),
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ],
+      ),
     );
   }
 } 

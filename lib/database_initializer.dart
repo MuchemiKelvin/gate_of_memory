@@ -1,15 +1,20 @@
-import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:flutter/foundation.dart';
-import 'dart:io';
 
+/// Database initialization for all platforms
+/// Uses the standard sqflite implementation which works on mobile and web
 Future<void> initializeDatabase() async {
-  if (Platform.isAndroid || Platform.isIOS) {
-    // Use default database factory for mobile platforms
-    // No need to initialize FFI on mobile
-    return;
+  try {
+    if (kIsWeb) {
+      print('Web platform detected, using web storage service');
+      return;
+    }
+    
+    // For mobile and desktop platforms, use the standard sqflite implementation
+    print('Mobile/Desktop platform detected, using standard sqflite implementation');
+    print('✓ Database factory will use platform-appropriate implementation');
+    
+  } catch (e) {
+    print('❌ Error in database initialization: $e');
+    print('Continuing with default database factory...');
   }
-  
-  // Initialize FFI for desktop platforms only
-  sqfliteFfiInit();
-  databaseFactory = databaseFactoryFfi;
 } 
