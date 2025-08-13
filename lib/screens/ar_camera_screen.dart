@@ -1,14 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:camera/camera.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
-import '../services/real_ar_session_manager.dart';
+import '../models/memorial.dart';
 import '../services/qr_code_service.dart';
-import '../widgets/ar_overlay_widget.dart';
-import '../services/database_init_service.dart';
-import 'images_page.dart';
-import 'videos_page.dart';
-import 'audio_page.dart';
-import 'stories_page.dart';
+import 'hologram_player_fullscreen_page.dart'; // Added import for HologramPlayerFullscreenPage
 
 class ARCameraScreen extends StatefulWidget {
   const ARCameraScreen({super.key});
@@ -18,532 +12,433 @@ class ARCameraScreen extends StatefulWidget {
 }
 
 class _ARCameraScreenState extends State<ARCameraScreen> {
-  final RealARSessionManager _realARSessionManager = RealARSessionManager();
-  final QRCodeService _qrCodeService = QRCodeService();
-  
-  bool _isInitialized = false;
-  String _statusMessage = 'Initializing Real AR...';
-  bool _showOverlayControls = false;
-  bool _showCameraControls = false;
-  bool _showContentInfo = false;
-  bool _cameraInitialized = false;
+  final QRCodeService _qrService = QRCodeService();
+  MobileScannerController? _controller;
+  bool _isScanning = false;
+  Memorial? _scannedMemorial;
 
   @override
   void initState() {
     super.initState();
-    _initializeRealAR();
-    _setupNavigationCallback();
+    _controller = MobileScannerController();
+    _setupQRService();
   }
 
-  Future<void> _initializeRealAR() async {
-    try {
-      print('Initializing REAL AR system...');
+  void _setupQRService() {
+    _qrService.statusStream.listen((status) {
       setState(() {
-        _statusMessage = 'Initializing Real AR...';
+        _isScanning = status == QRScanStatus.scanning;
       });
-      
-      // Initialize real AR session
-      final success = await _realARSessionManager.initialize();
-      if (!success) {
-        setState(() {
-          _statusMessage = 'Failed to initialize Real AR: ${_realARSessionManager.errorMessage}';
-        });
-        return;
-      }
-      
-      // Test database connection
-      await _realARSessionManager.contentLoadingService.testDatabaseConnection();
-      
-      // Start real AR session
-      await _realARSessionManager.startSession();
-      
+    });
+
+    _qrService.memorialStream.listen((memorial) {
       setState(() {
-        _isInitialized = true;
-        _cameraInitialized = true;
-        _statusMessage = 'Real AR Active - Point camera at QR marker';
+        _scannedMemorial = memorial;
       });
-      
-      print('Real AR system initialized successfully');
-    } catch (e) {
-      print('Error initializing real AR: $e');
-      setState(() {
-        _statusMessage = 'Error: $e';
-      });
-    }
-  }
+      _showMemorialResult(memorial);
+    });
 
-  @override
-  void dispose() {
-    _realARSessionManager.dispose();
-    super.dispose();
-  }
-
-  void _switchCamera() {
-    _realARSessionManager.cameraService.switchCamera();
-    setState(() {});
-  }
-
-  void _takePhoto() async {
-    await _realARSessionManager.cameraService.takePhoto();
-  }
-
-  void _toggleOverlayControls() {
-    setState(() {
-      _showOverlayControls = !_showOverlayControls;
+    _qrService.errorStream.listen((error) {
+      _showError(error);
     });
   }
 
-  void _toggleCameraControls() {
-    setState(() {
-      _showCameraControls = !_showCameraControls;
-    });
-  }
-
-
-  
-  /// Setup navigation callback for AR overlays
-  void _setupNavigationCallback() {
-    _realARSessionManager.overlayService.setNavigationCallback(_navigateToScreen);
-  }
-
-  void _handleRealQRScan(BarcodeCapture capture) {
-    try {
-      final List<Barcode> barcodes = capture.barcodes;
-      
-      if (barcodes.isEmpty) return;
-
-      for (final barcode in barcodes) {
-        final qrCode = barcode.rawValue;
-        
-        if (qrCode != null && qrCode.isNotEmpty) {
-          print('QR Code detected: $qrCode');
-          _processRealQRCode(qrCode);
-          return; // Process only the first valid QR code
-        }
-      }
-    } catch (e) {
-      print('Error in QR scanning: $e');
-    }
-  }
-
-  Future<void> _processRealQRCode(String qrCode) async {
-    try {
-      // Validate QR code against database
-      final memorial = await _qrCodeService.validateQRCode(qrCode);
-      
-      if (memorial != null) {
-        // Valid memorial found - trigger AR content loading through session manager
-        print('Valid memorial found: ${memorial.name}');
-        
-        // Use the AR session manager's QR detection handler
-        await _realARSessionManager.onQRDetected({
-          'qrCode': qrCode,
-          'confidence': 0.9,
-          'timestamp': DateTime.now().millisecondsSinceEpoch,
-          'position': {
-            'x': 0.5,
-            'y': 0.5,
-            'width': 0.2,
-            'height': 0.2,
-          },
-        });
-      } else {
-        // Invalid QR code - show error
-        _realARSessionManager.overlayService.showError(_qrCodeService.getErrorMessage());
-        print('Invalid QR code: ${_qrCodeService.lastError}');
-      }
-    } catch (e) {
-      print('Error processing real QR code: $e');
-      _realARSessionManager.overlayService.showError('Error processing QR code: $e');
-    }
-  }
-  
-  /// Navigate to specific screen with arguments
-  void _navigateToScreen(String screen, Map<String, dynamic>? arguments) {
-    print('Navigating to: $screen with arguments: $arguments');
-    
-    // Get memorial ID from arguments
-    final memorialId = arguments?['memorialId'] as String?;
-    
-    // Navigate based on screen name
-    switch (screen) {
-      case '/images':
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => ImagesPage(memorialId: memorialId),
-          ),
-        ).then((_) {
-          // When returning from the content page, keep the AR overlay visible
-          // Only clear overlays if we're not in an active AR session
-          if (_realARSessionManager.sessionState != RealARSessionState.active) {
-            _realARSessionManager.overlayService.clearOverlays();
-          }
-        });
-        break;
-      case '/videos':
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => VideosPage(memorialId: memorialId),
-          ),
-        ).then((_) {
-          // When returning from the content page, keep the AR overlay visible
-          if (_realARSessionManager.sessionState != RealARSessionState.active) {
-            _realARSessionManager.overlayService.clearOverlays();
-          }
-        });
-        break;
-      case '/audio':
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => AudioPage(memorialId: memorialId),
-          ),
-        ).then((_) {
-          // When returning from the content page, keep the AR overlay visible
-          if (_realARSessionManager.sessionState != RealARSessionState.active) {
-            _realARSessionManager.overlayService.clearOverlays();
-          }
-        });
-        break;
-      case '/stories':
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => StoriesPage(memorialId: memorialId),
-          ),
-        ).then((_) {
-          // When returning from the content page, keep the AR overlay visible
-          if (_realARSessionManager.sessionState != RealARSessionState.active) {
-            _realARSessionManager.overlayService.clearOverlays();
-          }
-        });
-        break;
-      case '/memorial-details':
-        Navigator.pushNamed(context, '/memorial-details', arguments: arguments).then((_) {
-          // When returning from the content page, keep the AR overlay visible
-          if (_realARSessionManager.sessionState != RealARSessionState.active) {
-            _realARSessionManager.overlayService.clearOverlays();
-          }
-        });
-        break;
-      case '/close':
-        // Only clear overlays when explicitly closing
-        _realARSessionManager.overlayService.clearOverlays();
-        break;
-      default:
-        print('Unknown screen: $screen');
-    }
-  }
-  
-  /// Show content message for unimplemented features
-  void _showContentMessage(String contentType, String? memorialId) {
+  void _showMemorialResult(Memorial memorial) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('$contentType Content'),
-        content: Text('$contentType content for ${_getMemorialName(memorialId)} will be displayed here.\n\nThis feature is coming soon!'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('OK'),
-          ),
-        ],
-      ),
-    );
-  }
-  
-  /// Get memorial name from ID
-  String _getMemorialName(String? memorialId) {
-    if (memorialId == null) return 'Unknown Memorial';
-    if (memorialId.contains('NAOMI')) return 'Naomi N.';
-    if (memorialId.contains('JOHN')) return 'John M.';
-    if (memorialId.contains('SARAH')) return 'Sarah K.';
-    return 'Unknown Memorial';
-  }
-
-  void _showARSettings() {
-    // Show AR settings dialog
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('AR Settings'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              title: Text('Marker Detection'),
-              subtitle: Text(_realARSessionManager.isMarkerDetected ? 'Active' : 'Inactive'),
-            ),
-            ListTile(
-              title: Text('Session State'),
-              subtitle: Text(_realARSessionManager.sessionState.toString().split('.').last),
-            ),
-          ],
+      barrierDismissible: false,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Close'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _toggleARSession() {
-    if (_realARSessionManager.sessionState == RealARSessionState.active) {
-      _realARSessionManager.pauseSession();
-    } else {
-      _realARSessionManager.resumeSession();
-    }
-    setState(() {});
-  }
-
-
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: Icon(Icons.close, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(
-          'AR Camera',
-          style: TextStyle(color: Colors.white),
-        ),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.switch_camera, color: Colors.white),
-            onPressed: _switchCamera,
-            tooltip: 'Switch Camera',
-          ),
-          IconButton(
-            icon: Icon(Icons.camera_alt, color: Colors.white),
-            onPressed: _takePhoto,
-            tooltip: 'Take Photo',
-          ),
-          IconButton(
-            icon: Icon(Icons.settings, color: Colors.white),
-            onPressed: _showARSettings,
-            tooltip: 'AR Settings',
-          ),
-        ],
-      ),
-             body: AROverlayWidget(
-         overlayService: _realARSessionManager.overlayService,
-         child: Stack(
-           children: [
-             // Camera Preview
-             Container(
-               width: double.infinity,
-               height: double.infinity,
-               child: _cameraInitialized
-                   ? _buildCameraPreview()
-                   : _buildCameraLoadingView(),
-             ),
-          
-          // AR Status Overlay
-          Positioned(
-            top: 20,
-            left: 20,
-            right: 20,
-            child: Container(
-              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.7),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(
-                _statusMessage,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ),
-          ),
-          
-          // AR Controls
-          Positioned(
-            bottom: 40,
-            left: 0,
-            right: 0,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                // Pause/Resume Button
-                FloatingActionButton(
-                  heroTag: 'ar_pause_resume',
-                  onPressed: _toggleARSession,
-                  backgroundColor: Color(0xFF7bb6e7),
-                  child: Icon(
-                    _realARSessionManager.sessionState == RealARSessionState.active
-                        ? Icons.pause
-                        : Icons.play_arrow,
-                    color: Colors.white,
-                  ),
-                ),
-                
-                // Marker Detection Status
-                Container(
-                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: _realARSessionManager.isMarkerDetected
-                        ? Colors.green.withOpacity(0.8)
-                        : Colors.orange.withOpacity(0.8),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    _realARSessionManager.isMarkerDetected
-                        ? 'Marker Detected'
-                        : 'Scanning...',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                
-                // Camera Controls Toggle
-                FloatingActionButton(
-                  heroTag: 'ar_camera_controls',
-                  onPressed: _toggleCameraControls,
-                  backgroundColor: Colors.white24,
-                  child: Icon(
-                    Icons.camera_alt,
-                    color: Colors.white,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          
-          // AR Instructions
-          if (!_realARSessionManager.isMarkerDetected)
-            Positioned(
-              top: 100,
-              left: 20,
-              right: 20,
-              child: Container(
-                padding: EdgeInsets.all(16),
+        child: Container(
+          width: MediaQuery.of(context).size.width * 0.9,
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header with memorial info
+              Container(
+                padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.7),
-                  borderRadius: BorderRadius.circular(12),
+                  gradient: LinearGradient(
+                    colors: [
+                      Color(0xFF7bb6e7),
+                      Color(0xFF5a9bd4),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(16),
                 ),
                 child: Column(
                   children: [
+                    Icon(
+                      Icons.qr_code_scanner,
+                      size: 48,
+                      color: Colors.white,
+                    ),
+                    SizedBox(height: 16),
                     Text(
-                      'Point camera at QR marker',
+                      'Memorial Found!',
                       style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
+                        fontSize: 24,
                         fontWeight: FontWeight.bold,
+                        color: Colors.white,
                       ),
                     ),
                     SizedBox(height: 8),
                     Text(
-                      'Hold steady to detect marker',
+                      memorial.name,
                       style: TextStyle(
-                        color: Colors.grey[300],
-                        fontSize: 14,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
                       ),
+                      textAlign: TextAlign.center,
                     ),
                   ],
                 ),
               ),
-            ),
-          
-
-           ],
-         ),
-       ),
-     );
-   }
-
-  Widget _buildCameraPreview() {
-    final cameraController = _realARSessionManager.cameraService.cameraController;
-    
-    if (cameraController == null || !cameraController.value.isInitialized) {
-      return Container(
-        width: double.infinity,
-        height: double.infinity,
-        color: Colors.black,
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.camera_alt,
-                color: Colors.white,
-                size: 64,
+              
+              SizedBox(height: 24),
+              
+              // Memorial details
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.grey[50],
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey[200]!),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Description',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey[800],
+                      ),
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      memorial.description,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                    SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Container(
+                          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Color(0xFF7bb6e7),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            memorial.category,
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        SizedBox(width: 12),
+                        Container(
+                          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[300],
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            memorial.qrCode,
+                            style: TextStyle(
+                              color: Colors.grey[700],
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
+              
+              SizedBox(height: 24),
+              
+              // Action buttons
+              Row(
+                children: [
+                  // Hologram button
+                  Expanded(
+                    child: Container(
+                      height: 56,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                          _openHologramPlayer(memorial);
+                        },
+                        icon: Icon(
+                          Icons.visibility,
+                          size: 24,
+                          color: Colors.white,
+                        ),
+                        label: Text(
+                          'View Hologram',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Color(0xFF7bb6e7),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          elevation: 4,
+                        ),
+                      ),
+                    ),
+                  ),
+                  
+                  SizedBox(width: 16),
+                  
+                  // Scan Another button
+                  Expanded(
+                    child: Container(
+                      height: 56,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                          // Continue scanning
+                        },
+                        icon: Icon(
+                          Icons.qr_code_scanner,
+                          size: 24,
+                          color: Colors.white,
+                        ),
+                        label: Text(
+                          'Scan Another',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.grey[600],
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          elevation: 4,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              
               SizedBox(height: 16),
-              Text(
-                'Camera Ready',
-                style: TextStyle(color: Colors.white, fontSize: 18),
-              ),
-              SizedBox(height: 8),
-              Text(
-                'Point at QR code to scan',
-                style: TextStyle(color: Colors.grey[400], fontSize: 14),
+              
+              // Close button
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: Text(
+                    'Close',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                  style: TextButton.styleFrom(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
               ),
             ],
           ),
-        ),
-      );
-    }
-
-    // Use MobileScanner for QR scanning
-    return MobileScanner(
-      onDetect: _handleRealQRScan,
-      controller: MobileScannerController(),
-    );
-  }
-
-  Widget _buildCameraLoadingView() {
-    return Container(
-      width: double.infinity,
-      height: double.infinity,
-      color: Colors.black,
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircularProgressIndicator(
-              color: Color(0xFF7bb6e7),
-            ),
-            SizedBox(height: 8),
-            Text(
-              'Initializing Real Camera...',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            SizedBox(height: 8),
-            Text(
-              'Please grant camera permission',
-              style: TextStyle(
-                color: Colors.grey[400],
-                fontSize: 14,
-              ),
-            ),
-          ],
         ),
       ),
     );
   }
 
+  void _openHologramPlayer(Memorial memorial) {
+    // Navigate to hologram player page
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => HologramPlayerFullscreenPage(
+          hologramPath: memorial.hologramPath,
+          title: '${memorial.name} - Hologram',
+        ),
+      ),
+    );
+  }
 
+  void _showError(String error) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Error: $error'),
+        backgroundColor: Colors.red,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('AR Camera Scanner'),
+        backgroundColor: Colors.black87,
+        foregroundColor: Colors.white,
+        actions: [
+          IconButton(
+            icon: Icon(_isScanning ? Icons.stop : Icons.play_arrow),
+            onPressed: () {
+              if (_isScanning) {
+                _controller?.stop();
+              } else {
+                _controller?.start();
+              }
+            },
+          ),
+        ],
+      ),
+      body: Stack(
+        children: [
+          MobileScanner(
+            controller: _controller,
+            onDetect: (capture) {
+              _qrService.handleQRScan(capture);
+            },
+          ),
+          if (_isScanning)
+            Positioned(
+              top: 20,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.black54,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Text(
+                    'Scanning QR Code...',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          // Scanning overlay
+          Positioned.fill(
+            child: CustomPaint(
+              painter: ScannerOverlayPainter(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+}
+
+class ScannerOverlayPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.0;
+
+    final center = Offset(size.width / 2, size.height / 2);
+    final scanAreaSize = size.width * 0.6;
+    final rect = Rect.fromCenter(
+      center: center,
+      width: scanAreaSize,
+      height: scanAreaSize,
+    );
+
+    // Draw scanning frame
+    canvas.drawRect(rect, paint);
+
+    // Draw corner indicators
+    final cornerLength = scanAreaSize * 0.1;
+    final cornerThickness = 4.0;
+
+    // Top-left corner
+    canvas.drawLine(
+      Offset(rect.left, rect.top + cornerLength),
+      Offset(rect.left, rect.top),
+      paint..strokeWidth = cornerThickness,
+    );
+    canvas.drawLine(
+      Offset(rect.left, rect.top),
+      Offset(rect.left + cornerLength, rect.top),
+      paint..strokeWidth = cornerThickness,
+    );
+
+    // Top-right corner
+    canvas.drawLine(
+      Offset(rect.right - cornerLength, rect.top),
+      Offset(rect.right, rect.top),
+      paint..strokeWidth = cornerThickness,
+    );
+    canvas.drawLine(
+      Offset(rect.right, rect.top),
+      Offset(rect.right, rect.top + cornerLength),
+      paint..strokeWidth = cornerThickness,
+    );
+
+    // Bottom-left corner
+    canvas.drawLine(
+      Offset(rect.left, rect.bottom - cornerLength),
+      Offset(rect.left, rect.bottom),
+      paint..strokeWidth = cornerThickness,
+    );
+    canvas.drawLine(
+      Offset(rect.left, rect.bottom),
+      Offset(rect.left + cornerLength, rect.bottom),
+      paint..strokeWidth = cornerThickness,
+    );
+
+    // Bottom-right corner
+    canvas.drawLine(
+      Offset(rect.right - cornerLength, rect.bottom),
+      Offset(rect.right, rect.bottom),
+      paint..strokeWidth = cornerThickness,
+    );
+    canvas.drawLine(
+      Offset(rect.right, rect.bottom - cornerLength),
+      Offset(rect.right, rect.bottom),
+      paint..strokeWidth = cornerThickness,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 } 

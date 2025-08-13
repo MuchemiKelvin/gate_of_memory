@@ -17,7 +17,7 @@ class _VideoPlayerFullscreenPageState extends State<VideoPlayerFullscreenPage> {
   bool _isInitialized = false;
   bool _hasError = false;
   String _errorMessage = '';
-  bool _isWindows = false;
+  bool _isWeb = false;
 
   @override
   void initState() {
@@ -31,10 +31,11 @@ class _VideoPlayerFullscreenPageState extends State<VideoPlayerFullscreenPage> {
 
       // Check if we're on web platform
       if (kIsWeb) {
-        print('Web platform detected - using fallback video player');
+        print('Web platform detected - using web-compatible video player');
         setState(() {
-          _hasError = true;
-          _errorMessage = 'Video playback is not supported on web platform yet. Video path: ${widget.videoPath}';
+          _isWeb = true;
+          _isInitialized = true;
+          _hasError = false;
         });
         return;
       }
@@ -56,22 +57,19 @@ class _VideoPlayerFullscreenPageState extends State<VideoPlayerFullscreenPage> {
         setState(() {
           _isInitialized = true;
           _hasError = false;
-          _isWindows = false; // Not Windows if we got here
+          _isWeb = false;
         });
         
-        print('✓ Video player initialized successfully');
+        print('Video player initialized successfully');
       } catch (e) {
-        print('❌ Video player initialization failed: $e');
-        // If video player fails, show Windows fallback
+        print('Video player initialization failed: $e');
         setState(() {
-          _isWindows = true;
-          _hasError = false;
-          _errorMessage = '';
+          _hasError = true;
+          _errorMessage = 'Failed to initialize video player: $e';
         });
-        print('Falling back to Windows interface due to video player failure');
       }
     } catch (e) {
-      print('❌ Error initializing video player: $e');
+      print('Error initializing video player: $e');
       setState(() {
         _hasError = true;
         _errorMessage = 'Failed to initialize video player: $e';
@@ -99,57 +97,58 @@ class _VideoPlayerFullscreenPageState extends State<VideoPlayerFullscreenPage> {
     });
   }
 
-  String _formatDuration(Duration d) {
+  void _seekTo(Duration position) {
+    if (_controller == null || !_isInitialized) return;
+    _controller!.seekTo(position);
+  }
+
+  String _formatDuration(Duration duration) {
     String twoDigits(int n) => n.toString().padLeft(2, '0');
-    final minutes = twoDigits(d.inMinutes.remainder(60));
-    final seconds = twoDigits(d.inSeconds.remainder(60));
-    return '$minutes:$seconds';
+    final hours = twoDigits(duration.inHours);
+    final minutes = twoDigits(duration.inMinutes.remainder(60));
+    final seconds = twoDigits(duration.inSeconds.remainder(60));
+    return duration.inHours > 0 ? '$hours:$minutes:$seconds' : '$minutes:$seconds';
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Color(0xFF1a2a3a),
+      backgroundColor: Colors.black,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: Icon(Icons.close, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(
-          'Video Player',
-          style: TextStyle(color: Colors.white),
-        ),
-      ),
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              Color(0xFF1a2a3a),
-              Color(0xFF2d3a4a),
-              Color(0xFF1a2a3a),
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+        title: Text(widget.title),
+        actions: [
+          IconButton(
+            icon: Icon(Icons.fullscreen),
+            onPressed: () {
+              // Toggle fullscreen mode
+            },
           ),
-        ),
-        child: _hasError
-            ? _buildErrorWidget()
-            : _isWindows
-                ? _buildWindowsFallbackWidget()
-                : _isInitialized
-                    ? _buildVideoPlayer()
-                    : _buildLoadingWidget(),
+        ],
       ),
+      body: _buildBody(),
     );
   }
 
-  Widget _buildErrorWidget() {
-    return Padding(
-      padding: EdgeInsets.all(20),
+  Widget _buildBody() {
+    if (_hasError) {
+      return _buildErrorWidget();
+    }
+
+    if (_isWeb) {
+      return _buildWebVideoWidget();
+    }
+
+    if (!_isInitialized || _controller == null) {
+      return _buildLoadingWidget();
+    }
+
+    return _buildVideoPlayerWidget();
+  }
+
+  Widget _buildWebVideoWidget() {
+    return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -160,142 +159,21 @@ class _VideoPlayerFullscreenPageState extends State<VideoPlayerFullscreenPage> {
           ),
           SizedBox(height: 20),
           Text(
-            'Video Not Available',
+            'Video: ${widget.title}',
             style: TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.bold,
               color: Colors.white,
             ),
-          ),
-          SizedBox(height: 10),
-          Text(
-            _errorMessage,
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.white70,
-            ),
             textAlign: TextAlign.center,
           ),
-          SizedBox(height: 20),
-          ElevatedButton.icon(
-            onPressed: () {
-              setState(() {
-                _hasError = false;
-                _errorMessage = '';
-              });
-              _initializeVideoPlayer();
-            },
-            icon: Icon(Icons.refresh),
-            label: Text('Retry'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Color(0xFF7bb6e7),
-              foregroundColor: Colors.white,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildVideoPlayer() {
-    if (_controller == null) return _buildErrorWidget();
-    
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        AspectRatio(
-          aspectRatio: _controller!.value.aspectRatio,
-          child: VideoPlayer(_controller!),
-        ),
-        SizedBox(height: 24),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            IconButton(
-              icon: Icon(
-                _controller!.value.isPlaying ? Icons.pause : Icons.play_arrow,
-                color: Colors.white,
-                size: 36,
-              ),
-              onPressed: _togglePlayPause,
-            ),
-            SizedBox(width: 16),
-            Expanded(
-              child: VideoProgressIndicator(
-                _controller!,
-                allowScrubbing: true,
-                colors: VideoProgressColors(
-                  playedColor: Color(0xFF7bb6e7),
-                  backgroundColor: Colors.white24,
-                  bufferedColor: Colors.white38,
-                ),
-              ),
-            ),
-            SizedBox(width: 16),
-            Text(
-              '${_formatDuration(_controller!.value.position)} / ${_formatDuration(_controller!.value.duration)}',
-              style: TextStyle(color: Colors.white),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildLoadingWidget() {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        CircularProgressIndicator(color: Color(0xFF7bb6e7)),
-        SizedBox(height: 20),
-        Text(
-          'Loading video...',
-          style: TextStyle(
-            fontSize: 18,
-            color: Colors.white,
-          ),
-        ),
-        SizedBox(height: 10),
-        Text(
-          widget.videoPath,
-          style: TextStyle(
-            fontSize: 14,
-            color: Colors.white54,
-          ),
-          textAlign: TextAlign.center,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildWindowsFallbackWidget() {
-    return Padding(
-      padding: EdgeInsets.all(20),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.video_file,
-            size: 80,
-            color: Colors.white54,
-          ),
-          SizedBox(height: 20),
+          SizedBox(height: 16),
           Text(
-            'Video Preview (Windows)',
+            'Web Video Player',
             style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
-          ),
-          SizedBox(height: 10),
-          Text(
-            'Video playback is not yet supported on Windows desktop.',
-            style: TextStyle(
-              fontSize: 16,
+              fontSize: 18,
               color: Colors.white70,
             ),
-            textAlign: TextAlign.center,
           ),
           SizedBox(height: 20),
           Container(
@@ -325,7 +203,7 @@ class _VideoPlayerFullscreenPageState extends State<VideoPlayerFullscreenPage> {
                   style: TextStyle(color: Colors.white70),
                 ),
                 Text(
-                  'Platform: Windows Desktop',
+                  'Platform: Web Browser',
                   style: TextStyle(color: Colors.white70),
                 ),
               ],
@@ -334,16 +212,193 @@ class _VideoPlayerFullscreenPageState extends State<VideoPlayerFullscreenPage> {
           SizedBox(height: 20),
           ElevatedButton.icon(
             onPressed: () {
-              // Show file info or open file location
+              // Show video info
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text('Video file: ${widget.videoPath}'),
+                  content: Text('Video: ${widget.title} - ${widget.videoPath}'),
                   duration: Duration(seconds: 3),
                 ),
               );
             },
             icon: Icon(Icons.info),
-            label: Text('Show File Info'),
+            label: Text('Show Video Info'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Color(0xFF7bb6e7),
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVideoPlayerWidget() {
+    return Column(
+      children: [
+        Expanded(
+          child: Center(
+            child: AspectRatio(
+              aspectRatio: _controller!.value.aspectRatio,
+              child: VideoPlayer(_controller!),
+            ),
+          ),
+        ),
+        _buildVideoControls(),
+      ],
+    );
+  }
+
+  Widget _buildVideoControls() {
+    return Container(
+      padding: EdgeInsets.all(16),
+      color: Colors.black87,
+      child: Column(
+        children: [
+          // Progress bar
+          ValueListenableBuilder(
+            valueListenable: _controller!,
+            builder: (context, VideoPlayerValue value, child) {
+              return Column(
+                children: [
+                  Slider(
+                    value: value.position.inMilliseconds.toDouble(),
+                    min: 0,
+                    max: value.duration.inMilliseconds.toDouble(),
+                    onChanged: (newValue) {
+                      _seekTo(Duration(milliseconds: newValue.round()));
+                    },
+                    activeColor: Color(0xFF7bb6e7),
+                  ),
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          _formatDuration(value.position),
+                          style: TextStyle(color: Colors.white),
+                        ),
+                        Text(
+                          _formatDuration(value.duration),
+                          style: TextStyle(color: Colors.white),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+          SizedBox(height: 16),
+          // Control buttons
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              IconButton(
+                icon: Icon(
+                  _isPlaying ? Icons.pause : Icons.play_arrow,
+                  size: 32,
+                  color: Colors.white,
+                ),
+                onPressed: _togglePlayPause,
+              ),
+              IconButton(
+                icon: Icon(
+                  Icons.replay_10,
+                  size: 24,
+                  color: Colors.white,
+                ),
+                onPressed: () {
+                  final currentPosition = _controller!.value.position;
+                  final newPosition = currentPosition - Duration(seconds: 10);
+                  _seekTo(newPosition.isNegative ? Duration.zero : newPosition);
+                },
+              ),
+              IconButton(
+                icon: Icon(
+                  Icons.forward_10,
+                  size: 24,
+                  color: Colors.white,
+                ),
+                onPressed: () {
+                  final currentPosition = _controller!.value.position;
+                  final newPosition = currentPosition + Duration(seconds: 10);
+                  final maxPosition = _controller!.value.duration;
+                  _seekTo(newPosition > maxPosition ? maxPosition : newPosition);
+                },
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLoadingWidget() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          CircularProgressIndicator(
+            color: Color(0xFF7bb6e7),
+          ),
+          SizedBox(height: 20),
+          Text(
+            'Loading video...',
+            style: TextStyle(
+              fontSize: 18,
+              color: Colors.white,
+            ),
+          ),
+          SizedBox(height: 10),
+          Text(
+            widget.videoPath,
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.white54,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorWidget() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.error_outline,
+            size: 80,
+            color: Colors.red[300],
+          ),
+          SizedBox(height: 20),
+          Text(
+            'Video Playback Error',
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
+          SizedBox(height: 16),
+          Text(
+            _errorMessage,
+            style: TextStyle(
+              fontSize: 16,
+              color: Colors.white70,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          SizedBox(height: 20),
+          ElevatedButton.icon(
+            onPressed: () {
+              _initializeVideoPlayer();
+            },
+            icon: Icon(Icons.refresh),
+            label: Text('Retry'),
             style: ElevatedButton.styleFrom(
               backgroundColor: Color(0xFF7bb6e7),
               foregroundColor: Colors.white,

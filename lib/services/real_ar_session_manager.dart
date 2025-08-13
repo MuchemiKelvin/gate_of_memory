@@ -1,345 +1,220 @@
 import 'package:flutter/material.dart';
-import 'package:camera/camera.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
+import '../models/memorial.dart';
 import 'real_camera_service.dart';
-import 'real_qr_detection_service.dart';
-import 'real_hologram_service.dart';
-import 'ar_content_loading_service.dart';
-import 'ar_overlay_service.dart';
 import 'qr_code_service.dart';
-import 'dart:async';
 
-enum RealARSessionState {
-  initializing,
-  ready,
-  active,
-  paused,
-  error,
-}
-
+/// Manager for AR session operations
 class RealARSessionManager {
   static final RealARSessionManager _instance = RealARSessionManager._internal();
   factory RealARSessionManager() => _instance;
   RealARSessionManager._internal();
 
-  // Services
   final RealCameraService _cameraService = RealCameraService();
-  final RealQRDetectionService _qrDetectionService = RealQRDetectionService();
-  final RealHologramService _hologramService = RealHologramService();
-  final ARContentLoadingService _contentLoadingService = ARContentLoadingService();
-  final AROverlayService _overlayService = AROverlayService();
-  final QRCodeService _qrCodeService = QRCodeService();
-
-  // Session state
-  RealARSessionState _sessionState = RealARSessionState.initializing;
-  String _errorMessage = '';
-  DateTime? _sessionStartTime;
-  String? _currentMarkerId;
-  Map<String, dynamic>? _currentARContent;
+  final QRCodeService _qrService = QRCodeService();
   
-  // Content state tracking
-  String? _currentlyLoadedContent;
-  bool _isLoadingHologram = false;
-
-  // Stream subscriptions
-  StreamSubscription? _qrDetectionSubscription;
-  StreamSubscription? _hologramSubscription;
+  bool _isSessionActive = false;
+  bool _isTracking = false;
+  Memorial? _currentMemorial;
+  DateTime? _sessionStartTime;
 
   // Getters
-  RealARSessionState get sessionState => _sessionState;
-  String get errorMessage => _errorMessage;
-  String? get currentMarkerId => _currentMarkerId;
-  Map<String, dynamic>? get currentARContent => _currentARContent;
-  RealCameraService get cameraService => _cameraService;
-  RealQRDetectionService get qrDetectionService => _qrDetectionService;
-  RealHologramService get hologramService => _hologramService;
-  ARContentLoadingService get contentLoadingService => _contentLoadingService;
-  AROverlayService get overlayService => _overlayService;
-  QRCodeService get qrCodeService => _qrCodeService;
+  bool get isSessionActive => _isSessionActive;
+  bool get isTracking => _isTracking;
+  Memorial? get currentMemorial => _currentMemorial;
+  DateTime? get sessionStartTime => _sessionStartTime;
 
-  bool get isInitialized => _sessionState != RealARSessionState.initializing;
-  bool get isActive => _sessionState == RealARSessionState.active;
-  bool get isMarkerDetected => _currentMarkerId != null;
-  int get sessionDuration {
-    if (_sessionStartTime == null) return 0;
-    return DateTime.now().difference(_sessionStartTime!).inSeconds;
-  }
-
-  /// Initialize real AR session
-  Future<bool> initialize() async {
+  /// Initialize AR session
+  Future<bool> initializeSession() async {
     try {
-      print('Initializing REAL AR session...');
-      _sessionState = RealARSessionState.initializing;
-      _errorMessage = '';
-
-      // Initialize all services
-      final cameraSuccess = await _cameraService.initialize();
-      if (!cameraSuccess) {
-        _errorMessage = 'Camera initialization failed';
-        _sessionState = RealARSessionState.error;
+      print('Initializing AR session...');
+      
+      // Initialize camera service
+      final cameraInitialized = await _cameraService.initialize();
+      if (!cameraInitialized) {
+        print('Failed to initialize camera service');
         return false;
       }
 
-      final qrSuccess = await _qrDetectionService.initialize();
-      if (!qrSuccess) {
-        _errorMessage = 'QR detection initialization failed';
-        _sessionState = RealARSessionState.error;
-        return false;
-      }
-
-      final hologramSuccess = await _hologramService.initialize();
-      if (!hologramSuccess) {
-        _errorMessage = 'Hologram service initialization failed';
-        _sessionState = RealARSessionState.error;
-        return false;
-      }
-
-      // Set up stream subscriptions
-      _setupStreamSubscriptions();
-
-      _sessionState = RealARSessionState.ready;
-      print('Real AR session initialized successfully');
+      // Setup QR service listeners
+      _setupQRServiceListeners();
+      
+      _isSessionActive = true;
+      _sessionStartTime = DateTime.now();
+      
+      print('AR session initialized successfully');
       return true;
     } catch (e) {
-      print('Error initializing real AR session: $e');
-      _errorMessage = 'Initialization error: $e';
-      _sessionState = RealARSessionState.error;
+      print('Error initializing AR session: $e');
       return false;
     }
   }
 
-  /// Set up stream subscriptions for real-time processing
-  void _setupStreamSubscriptions() {
-    // Subscribe to QR detection results
-    _qrDetectionSubscription = _qrDetectionService.detectionStream.listen((detectionData) {
-      if (_sessionState == RealARSessionState.active) {
-        onQRDetected(detectionData);
+  /// Setup QR service listeners
+  void _setupQRServiceListeners() {
+    _qrService.statusStream.listen((status) {
+      switch (status) {
+        case QRScanStatus.scanning:
+          _isTracking = true;
+          break;
+        case QRScanStatus.success:
+          _isTracking = false;
+          break;
+        case QRScanStatus.error:
+          _isTracking = false;
+          break;
+        default:
+          _isTracking = false;
       }
     });
 
-    // Subscribe to hologram updates
-    _hologramSubscription = _hologramService.hologramStream.listen((hologramData) {
-      if (_sessionState == RealARSessionState.active) {
-        _onHologramUpdated(hologramData);
-      }
+    _qrService.memorialStream.listen((memorial) {
+      _currentMemorial = memorial;
+      print('Memorial detected in AR session: ${memorial.name}');
+    });
+
+    _qrService.errorStream.listen((error) {
+      print('AR session error: $error');
     });
   }
 
-  /// Start real AR session
-  Future<void> startSession() async {
+  /// Start AR tracking
+  Future<bool> startTracking() async {
     try {
-      print('Starting REAL AR session...');
-      
-      // Reset content state for new session
-      _currentlyLoadedContent = null;
-      _overlayService.clearOverlays();
-      
-      // Start camera preview
-      await _cameraService.startPreview();
-      
-      // Start QR detection
-      await _qrDetectionService.startDetection();
-      
-      // Start session tracking
-      _sessionStartTime = DateTime.now();
-      _sessionState = RealARSessionState.active;
-      
-      _overlayService.showInfo('Real AR session started');
-      print('Real AR session started successfully');
-    } catch (e) {
-      print('Error starting real AR session: $e');
-      _errorMessage = 'Session start error: $e';
-      _sessionState = RealARSessionState.error;
-    }
-  }
-
-  /// Pause real AR session
-  Future<void> pauseSession() async {
-    try {
-      print('Pausing REAL AR session...');
-      _sessionState = RealARSessionState.paused;
-      _overlayService.showInfo('AR session paused');
-    } catch (e) {
-      print('Error pausing real AR session: $e');
-    }
-  }
-
-  /// Resume real AR session
-  Future<void> resumeSession() async {
-    try {
-      print('Resuming REAL AR session...');
-      _sessionState = RealARSessionState.active;
-      _overlayService.showInfo('AR session resumed');
-    } catch (e) {
-      print('Error resuming real AR session: $e');
-    }
-  }
-
-
-
-  /// Handle QR code detection with real validation
-  Future<void> onQRDetected(Map<String, dynamic> detectionData) async {
-    final qrCode = detectionData['qrCode'] as String?;
-    final confidence = detectionData['confidence'] as double?;
-    
-    if (qrCode != null && confidence != null && confidence > 0.7) {
-      // Simple check - only load if not already loaded
-      if (_currentlyLoadedContent == qrCode) {
-        print('Content already loaded for: $qrCode');
-        return;
+      if (!_isSessionActive) {
+        print('AR session not active');
+        return false;
       }
-      
-      print('Real QR detected: $qrCode (${(confidence * 100).toStringAsFixed(1)}%)');
-      
-      // Validate QR code against database
-      final memorial = await _qrCodeService.validateQRCode(qrCode);
-      
-      if (memorial != null) {
-        // Valid memorial found
-        _currentMarkerId = qrCode;
-        _overlayService.showMarkerDetection(qrCode);
-        
-        // Load AR content for the detected marker
-        _loadARContentForMarker(qrCode);
+
+      final cameraStarted = await _cameraService.startCamera();
+      if (cameraStarted) {
+        _isTracking = true;
+        print('AR tracking started');
+        return true;
       } else {
-        // Invalid QR code - show error
-        _overlayService.showError(_qrCodeService.getErrorMessage());
-        print('Invalid QR code: ${_qrCodeService.lastError}');
-      }
-    }
-  }
-
-  /// Load AR content for detected marker
-  Future<void> _loadARContentForMarker(String markerId) async {
-    try {
-      _isLoadingHologram = true;
-      _overlayService.showLoading('Loading real AR content...');
-      
-      // Load content from database
-      final content = await _contentLoadingService.loadContent(markerId, {
-        'id': markerId,
-        'type': 'memorial',
-        'name': 'Real Memorial Content',
-        'content': 'hologram_${markerId.toLowerCase()}',
-        'position': {'x': 0, 'y': 0, 'z': 0},
-        'scale': 1,
-        'rotation': 0,
-      });
-
-      if (content != null) {
-        _currentARContent = {
-          'id': content.id,
-          'title': content.title,
-          'description': content.description,
-          'hologramPath': content.hologramPath,
-          'type': content.type.toString(),
-        };
-
-        // Load real hologram
-        await _hologramService.loadHologram(markerId, {
-          'hologramPath': content.hologramPath,
-          'position': {'x': 0.0, 'y': 0.0, 'z': 0.0},
-          'rotation': {'x': 0.0, 'y': 0.0, 'z': 0.0},
-          'scale': 1.0,
-        });
-
-        // Clear previous overlays and show the new content (video-based MVP)
-        _overlayService.clearOverlays();
-        _overlayService.showHologram(markerId, hologramPath: content.hologramPath);
-        
-        // Add a small delay before showing the info message to prevent interference
-        await Future.delayed(Duration(milliseconds: 100));
-        
-        // Show success message briefly
-        _overlayService.showInfo('Real AR content loaded: ${content.title}');
-        
-        // Mark this content as loaded
-        _currentlyLoadedContent = markerId;
-        _isLoadingHologram = false;
-        
-        print('Real AR content loaded: ${content.title}');
-      } else {
-        _overlayService.showError('Failed to load real AR content');
-        print('Failed to load real AR content for marker: $markerId');
-        _isLoadingHologram = false;
+        print('Failed to start camera for tracking');
+        return false;
       }
     } catch (e) {
-      print('Error loading real AR content: $e');
-      _overlayService.showError('Error loading AR content: $e');
-      _isLoadingHologram = false;
+      print('Error starting AR tracking: $e');
+      return false;
     }
   }
 
-  /// Handle hologram updates
-  void _onHologramUpdated(Map<String, dynamic> hologramData) {
-    final hologramId = hologramData['hologramId'] as String?;
-    final position = hologramData['position'];
-    final rotation = hologramData['rotation'];
-    final scale = hologramData['scale'];
-    
-    if (hologramId != null) {
-      print('Real hologram updated: $hologramId');
-      
-      // Don't interfere if we're currently loading a hologram
-      if (_isLoadingHologram) {
-        print('Skipping hologram update - currently loading hologram');
-        return;
-      }
-      
-      // Only update if this is a different hologram or if we need to refresh
-      // Don't interfere with the initial hologram display
-      if (_currentMarkerId != hologramId) {
-        _overlayService.showHologram(hologramId);
+  /// Stop AR tracking
+  Future<bool> stopTracking() async {
+    try {
+      final cameraStopped = await _cameraService.stopCamera();
+      if (cameraStopped) {
+        _isTracking = false;
+        print('AR tracking stopped');
+        return true;
       } else {
-        print('Skipping hologram update for current marker: $hologramId');
+        print('Failed to stop camera for tracking');
+        return false;
       }
+    } catch (e) {
+      print('Error stopping AR tracking: $e');
+      return false;
     }
   }
 
-  /// Get session status
-  String getSessionStatus() {
-    switch (_sessionState) {
-      case RealARSessionState.initializing:
-        return 'Initializing Real AR...';
-      case RealARSessionState.ready:
-        return 'Real AR Ready';
-      case RealARSessionState.active:
-        return 'Real AR Active - Scanning';
-      case RealARSessionState.paused:
-        return 'Real AR Paused';
-      case RealARSessionState.error:
-        return 'Real AR Error: $_errorMessage';
+  /// Pause AR session
+  Future<bool> pauseSession() async {
+    try {
+      if (_isTracking) {
+        await stopTracking();
+      }
+      
+      print('AR session paused');
+      return true;
+    } catch (e) {
+      print('Error pausing AR session: $e');
+      return false;
     }
   }
 
-  /// Get camera status
-  String getCameraStatus() {
-    return _cameraService.getStatus();
+  /// Resume AR session
+  Future<bool> resumeSession() async {
+    try {
+      if (_isSessionActive && !_isTracking) {
+        return await startTracking();
+      }
+      
+      print('AR session resumed');
+      return true;
+    } catch (e) {
+      print('Error resuming AR session: $e');
+      return false;
+    }
   }
 
-  /// Get comprehensive session info
-  Map<String, dynamic> getSessionInfo() {
+  /// Get session statistics
+  Map<String, dynamic> getSessionStats() {
+    final now = DateTime.now();
+    final sessionDuration = _sessionStartTime != null 
+        ? now.difference(_sessionStartTime!).inSeconds 
+        : 0;
+
     return {
-      'sessionState': _sessionState.toString(),
+      'isSessionActive': _isSessionActive,
+      'isTracking': _isTracking,
+      'sessionStartTime': _sessionStartTime?.toIso8601String(),
       'sessionDuration': sessionDuration,
-      'currentMarkerId': _currentMarkerId,
-      'currentARContent': _currentARContent,
-      'cameraStatus': _cameraService.getStatus(),
-      'qrDetectionStatus': _qrDetectionService.getStatus(),
-      'hologramStatus': _hologramService.getStatus(),
-      'overlayCount': _overlayService.visibleOverlays.length,
-      'errorMessage': _errorMessage,
+      'currentMemorial': _currentMemorial?.name,
+      'cameraStatus': _cameraService.getCameraStatus(),
     };
   }
 
-  /// Dispose real AR session
-  void dispose() {
-    _qrDetectionSubscription?.cancel();
-    _hologramSubscription?.cancel();
-    
-    _cameraService.dispose();
-    _qrDetectionService.dispose();
-    _hologramService.dispose();
-    
-    print('Real AR session disposed');
+  /// Reset session
+  void resetSession() {
+    try {
+      _isSessionActive = false;
+      _isTracking = false;
+      _currentMemorial = null;
+      _sessionStartTime = null;
+      
+      _cameraService.reset();
+      
+      print('AR session reset');
+    } catch (e) {
+      print('Error resetting AR session: $e');
+    }
+  }
+
+  /// End AR session
+  Future<void> endSession() async {
+    try {
+      print('Ending AR session...');
+      
+      // Stop tracking if active
+      if (_isTracking) {
+        await stopTracking();
+      }
+      
+      // Dispose camera service
+      _cameraService.dispose();
+      
+      // Reset session state
+      resetSession();
+      
+      print('AR session ended successfully');
+    } catch (e) {
+      print('Error ending AR session: $e');
+    }
+  }
+
+  /// Get session health status
+  Map<String, dynamic> getSessionHealth() {
+    return {
+      'sessionActive': _isSessionActive,
+      'trackingActive': _isTracking,
+      'cameraInitialized': _cameraService.isInitialized,
+      'cameraPermission': _cameraService.hasPermission,
+      'memorialDetected': _currentMemorial != null,
+      'sessionDuration': _sessionStartTime != null 
+          ? DateTime.now().difference(_sessionStartTime!).inSeconds 
+          : 0,
+    };
   }
 } 

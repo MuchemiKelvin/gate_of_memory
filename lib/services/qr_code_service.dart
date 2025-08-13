@@ -3,6 +3,8 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'memorial_service.dart';
 import '../models/memorial.dart';
 import 'dart:async';
+import 'sync_service.dart';
+import 'template_service.dart';
 
 enum QRScanStatus {
   idle,
@@ -19,6 +21,9 @@ class QRCodeService {
   QRCodeService._internal();
 
   final MemorialService _memorialService = MemorialService();
+  final SyncService _syncService = SyncService.instance;
+  final TemplateService _templateService = TemplateService.instance;
+  
   final StreamController<QRScanStatus> _statusController = StreamController<QRScanStatus>.broadcast();
   final StreamController<String> _errorController = StreamController<String>.broadcast();
   final StreamController<Memorial> _memorialController = StreamController<Memorial>.broadcast();
@@ -35,43 +40,176 @@ class QRCodeService {
   String? get lastError => _lastError;
   Memorial? get lastScannedMemorial => _lastScannedMemorial;
 
-  /// Validate QR code against database
+  /// Validate QR code against database and trigger sync
   Future<Memorial?> validateQRCode(String qrCode) async {
+    print('=== QR CODE VALIDATION DEBUG ===');
+    print('Scanned QR Code: "$qrCode"');
+    
     try {
       _updateStatus(QRScanStatus.scanning);
       
       // Check if QR code is empty or null
       if (qrCode.isEmpty) {
+        print('❌ QR code is empty or invalid');
         _handleError('QR code is empty or invalid');
         return null;
       }
 
       // Validate QR code format (basic check)
       if (!_isValidQRFormat(qrCode)) {
+        print('❌ Invalid QR code format: $qrCode');
         _handleError('Invalid QR code format');
         return null;
       }
 
+      print('✓ QR code format is valid, checking database...');
+      
       // Check if QR code exists in database
       final memorial = await _memorialService.getMemorialByQRCode(qrCode);
       
       if (memorial == null) {
+        print('❌ QR code not found in database: $qrCode');
         _updateStatus(QRScanStatus.notFound);
         _handleError('QR code not found in database: $qrCode');
         return null;
       }
 
-      // Success - memorial found
+      print('✓ Memorial found in database:');
+      print('  - ID: ${memorial.id}');
+      print('  - Name: ${memorial.name}');
+      print('  - QR Code: ${memorial.qrCode}');
+      print('  - Has Image: ${memorial.hasImage}');
+      print('  - Has Video: ${memorial.hasVideo}');
+      print('  - Has Audio: ${memorial.hasAudio}');
+      print('  - Has Stories: ${memorial.hasStories}');
+
+      // Success - memorial found, now trigger sync
       _lastScannedMemorial = memorial;
       _updateStatus(QRScanStatus.success);
       _memorialController.add(memorial);
       
-      print('QR Code validated successfully: ${memorial.name} (${memorial.qrCode})');
+      print('✓ QR Code validated successfully: ${memorial.name} (${memorial.qrCode})');
+      
+      // 🔄 NEW: Automatically trigger sync after successful QR validation
+      await _triggerSyncAfterQRValidation(memorial);
+      
       return memorial;
 
     } catch (e) {
+      print('❌ Database error during QR validation: $e');
       _handleError('Database error: $e');
       return null;
+    }
+    
+    print('=== END QR CODE VALIDATION DEBUG ===');
+  }
+
+  /// Trigger sync operations after QR validation
+  Future<void> _triggerSyncAfterQRValidation(Memorial memorial) async {
+    try {
+      print('Triggering sync after QR validation for memorial: ${memorial.name}');
+      
+      // Step 1: Check if we need to sync templates
+      final needsSync = await _checkIfSyncNeeded(memorial);
+      if (needsSync) {
+        print('Sync needed, starting template synchronization...');
+        
+        // Step 2: Start template sync
+        final syncSuccess = await _syncService.syncTemplates();
+        if (syncSuccess) {
+          print('Template sync completed successfully');
+          
+          // Step 3: Download specific memorial template if available
+          await _downloadMemorialTemplate(memorial);
+        } else {
+          print('Template sync failed, but memorial is still accessible');
+        }
+      } else {
+        print('No sync needed, memorial content is up to date');
+      }
+      
+    } catch (e) {
+      print('Error during sync trigger: $e');
+      // Don't fail the QR validation if sync fails
+      // Memorial is still accessible from local database
+    }
+  }
+
+  /// Check if sync is needed for this memorial
+  Future<bool> _checkIfSyncNeeded(Memorial memorial) async {
+    try {
+      // Check if we have recent sync data
+      final lastSync = _syncService.lastSyncAttempt;
+      if (lastSync == null) {
+        print('No previous sync found, sync needed');
+        return true;
+      }
+      
+      // Check if sync is older than 1 hour
+      final timeSinceLastSync = DateTime.now().difference(lastSync);
+      if (timeSinceLastSync.inHours > 1) {
+        print('Last sync was ${timeSinceLastSync.inHours} hours ago, sync needed');
+        return true;
+      }
+      
+      // Check if memorial content needs updating
+      final hasRecentContent = await _checkMemorialContentFreshness(memorial);
+      if (!hasRecentContent) {
+        print('Memorial content is stale, sync needed');
+        return true;
+      }
+      
+      print('Memorial content is fresh, no sync needed');
+      return false;
+      
+    } catch (e) {
+      print('Error checking sync need: $e, defaulting to sync needed');
+      return true; // Default to sync if we can't determine
+    }
+  }
+
+  /// Check if memorial content is fresh
+  Future<bool> _checkMemorialContentFreshness(Memorial memorial) async {
+    try {
+      // Check if memorial was updated recently (within last 24 hours)
+      final memorialAge = DateTime.now().difference(memorial.updatedAt);
+      if (memorialAge.inHours > 24) {
+        print('Memorial is ${memorialAge.inHours} hours old, sync needed');
+        return false;
+      }
+      
+      print('Memorial is fresh (${memorialAge.inHours} hours old)');
+      return true;
+      
+    } catch (e) {
+      print('Error checking content freshness: $e');
+      return false; // Default to needing sync if we can't determine
+    }
+  }
+
+  /// Download memorial-specific template
+  Future<void> _downloadMemorialTemplate(Memorial memorial) async {
+    try {
+      print('Checking for templates related to memorial: ${memorial.name}');
+      
+      // Get templates by category that match this memorial
+      final templates = await _templateService.fetchTemplatesByCategory(memorial.category);
+      if (templates != null && templates.isNotEmpty) {
+        print('Found ${templates.length} templates for category: ${memorial.category}');
+        
+        // Download the first template as an example
+        final template = templates.first;
+        final downloadSuccess = await _templateService.downloadTemplate(template.id);
+        if (downloadSuccess) {
+          print('Template downloaded successfully for ${memorial.name}');
+        } else {
+          print('Template download failed for ${memorial.name}');
+        }
+      } else {
+        print('No templates found for category: ${memorial.category}');
+      }
+    } catch (e) {
+      print('Error downloading memorial template: $e');
     }
   }
 

@@ -5,6 +5,9 @@ import '../services/memorial_service.dart';
 import '../services/database_init_service.dart';
 import 'memorial_detail_screen.dart';
 import '../widgets/memorial_card.dart';
+import '../services/sync_service.dart';
+import '../services/app_startup_service.dart';
+import 'memorial_details_page.dart';
 
 class MemorialDashboardScreen extends StatefulWidget {
   const MemorialDashboardScreen({super.key});
@@ -16,6 +19,7 @@ class MemorialDashboardScreen extends StatefulWidget {
 class _MemorialDashboardScreenState extends State<MemorialDashboardScreen> {
   final MemorialService _memorialService = MemorialService();
   final DatabaseInitService _dbInitService = DatabaseInitService();
+  final SyncService _syncService = SyncService.instance;
   
   List<Memorial> _memorials = [];
   List<Category> _categories = [];
@@ -24,11 +28,46 @@ class _MemorialDashboardScreenState extends State<MemorialDashboardScreen> {
   String _searchQuery = '';
   bool _isLoading = true;
   bool _isInitializing = false;
+  bool _isSyncing = false;
+  String _syncStatus = 'Ready';
+  DateTime? _lastSyncTime;
 
   @override
   void initState() {
     super.initState();
-    _initializeData();
+    // Start initialization in background without blocking UI
+    _initializeDataInBackground();
+    _loadSyncStatus();
+  }
+
+  Future<void> _initializeDataInBackground() async {
+    // Don't show initialization screen, just start loading data
+    try {
+      print('Starting background database initialization...');
+      
+      // Initialize database if needed (in background)
+      await _dbInitService.initializeDatabase();
+      print('Background database initialization completed successfully');
+      
+      // Load data (in background)
+      await _loadData();
+      print('Background data loading completed successfully');
+      
+    } catch (e) {
+      print('Background initialization error: $e');
+      
+      // Show error dialog only if user tries to interact
+      if (mounted) {
+        // Don't show error dialog immediately, just log it
+        // User will see the error when they try to use features
+        print('Database initialization failed: $e');
+        
+        // Set loading to false so user can see the empty state
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   Future<void> _initializeData() async {
@@ -80,6 +119,79 @@ class _MemorialDashboardScreenState extends State<MemorialDashboardScreen> {
       print('Error loading data: $e');
       setState(() {
         _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _loadSyncStatus() async {
+    try {
+      final lastSync = _syncService.lastSyncAttempt;
+      final isSyncing = _syncService.isSyncing;
+      
+      setState(() {
+        _lastSyncTime = lastSync;
+        _isSyncing = isSyncing;
+        _syncStatus = isSyncing ? 'Syncing...' : 'Ready';
+      });
+    } catch (e) {
+      print('Error loading sync status: $e');
+    }
+  }
+
+  Future<void> _performManualSync() async {
+    try {
+      setState(() {
+        _isSyncing = true;
+        _syncStatus = 'Starting sync...';
+      });
+
+      print('Manual sync triggered by user');
+      
+      // Perform template sync
+      final syncSuccess = await _syncService.syncTemplates();
+      
+      if (syncSuccess) {
+        setState(() {
+          _syncStatus = 'Sync completed successfully';
+          _lastSyncTime = DateTime.now();
+        });
+        
+        // Reload memorials to get any updates
+        await _loadData();
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Sync completed successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        setState(() {
+          _syncStatus = 'Sync failed';
+        });
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Sync failed. Please try again.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      print('Error during manual sync: $e');
+      setState(() {
+        _syncStatus = 'Sync error';
+      });
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Sync error: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      setState(() {
+        _isSyncing = false;
       });
     }
   }
@@ -136,13 +248,13 @@ class _MemorialDashboardScreenState extends State<MemorialDashboardScreen> {
                 await _loadData();
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Database re-seeded successfully.')),
+                    const SnackBar(content: Text('Database refreshed successfully.')),
                   );
                 }
               } catch (e) {
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Re-seed failed: $e')),
+                    SnackBar(content: Text('Refresh failed: $e')),
                   );
                 }
               } finally {
@@ -154,11 +266,22 @@ class _MemorialDashboardScreenState extends State<MemorialDashboardScreen> {
               }
             },
             style: TextButton.styleFrom(foregroundColor: Colors.blue),
-            child: const Text('Reseed DB'),
+            child: const Text('Refresh DB'),
           ),
         ],
       ),
     );
+  }
+
+  String _getTimeAgo(DateTime? dateTime) {
+    if (dateTime == null) return 'Never';
+    
+    final difference = DateTime.now().difference(dateTime);
+    
+    if (difference.inMinutes < 1) return 'Just now';
+    if (difference.inMinutes < 60) return '${difference.inMinutes}m ago';
+    if (difference.inHours < 24) return '${difference.inHours}h ago';
+    return '${difference.inDays}d ago';
   }
 
   @override
@@ -172,35 +295,26 @@ class _MemorialDashboardScreenState extends State<MemorialDashboardScreen> {
         actions: [
           // Debug button for testing
           IconButton(
-            icon: const Icon(Icons.bug_report),
+            icon: const Icon(Icons.refresh),
             onPressed: () async {
               try {
                 final dbInitService = DatabaseInitService();
                 await dbInitService.forceReseed();
                 _loadData(); // Reload data after re-seeding
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Database re-seeded successfully!')),
+                  const SnackBar(content: Text('Database refreshed successfully!')),
                 );
               } catch (e) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Error re-seeding: $e')),
+                  SnackBar(content: Text('Error refreshing: $e')),
                 );
               }
             },
-            tooltip: 'Re-seed Database (Debug)',
+            tooltip: 'Refresh Database (Debug)',
           ),
-          // Database info button
-          IconButton(
-            icon: const Icon(Icons.info_outline),
-            onPressed: () async {
-              try {
-                await _showDatabaseInfo();
-              } catch (e) {
-                _showErrorDialog('Database Error', 'Failed to get database info: $e');
-              }
-            },
-            tooltip: 'Database Info',
-          ),
+
+          // 🔄 NEW: Sync status indicator and manual sync button
+          _buildSyncStatusIndicator(),
         ],
       ),
       body: _isInitializing
@@ -215,16 +329,109 @@ class _MemorialDashboardScreenState extends State<MemorialDashboardScreen> {
               ),
             )
           : _isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : Column(
-                  children: [
-                    _buildSearchAndFilterSection(),
-                    _buildStatisticsSection(),
-                    Expanded(
-                      child: _buildMemorialsGrid(),
+              ? const Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      CircularProgressIndicator(),
+                      SizedBox(height: 16),
+                      Text('Loading memorials...'),
+                      SizedBox(height: 8),
+                      Text(
+                        'This may take a moment on first launch',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey,
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              : _memorials.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.photo_library_outlined,
+                            size: 64,
+                            color: Colors.grey[400],
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'No memorials available',
+                            style: TextStyle(
+                              color: Colors.grey[600],
+                              fontSize: 18,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'This might be due to a database issue',
+                            style: TextStyle(
+                              color: Colors.grey[500],
+                              fontSize: 14,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Try refreshing the database to load memorials',
+                            style: TextStyle(
+                              color: Colors.grey[500],
+                              fontSize: 12,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              ElevatedButton.icon(
+                                onPressed: _attemptDatabaseRepair,
+                                icon: const Icon(Icons.build),
+                                label: const Text('Auto Repair'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.orange[700],
+                                  foregroundColor: Colors.white,
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              ElevatedButton.icon(
+                                onPressed: () async {
+                                  try {
+                                    final dbInitService = DatabaseInitService();
+                                    await dbInitService.forceReseed();
+                                    _loadData(); // Reload data after re-seeding
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('Database refreshed successfully!')),
+                                    );
+                                  } catch (e) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('Error refreshing: $e')),
+                                    );
+                                  }
+                                },
+                                icon: const Icon(Icons.refresh),
+                                label: const Text('Refresh Data'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.blue[700],
+                                  foregroundColor: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    )
+                  : Column(
+                      children: [
+                        _buildSearchAndFilterSection(),
+                        _buildStatisticsSection(),
+                        Expanded(
+                          child: _buildMemorialsGrid(),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
           // TODO: Navigate to add new memorial screen
@@ -586,6 +793,143 @@ class _MemorialDashboardScreenState extends State<MemorialDashboardScreen> {
       } catch (e) {
         _showErrorDialog('Reset Error', 'Failed to reset database: $e');
       } finally {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  /// 🔄 NEW: Build sync status indicator in app bar
+  Widget _buildSyncStatusIndicator() {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Sync status icon
+        Container(
+          padding: const EdgeInsets.all(8),
+          child: Icon(
+            _isSyncing ? Icons.sync : Icons.sync_disabled,
+            color: _isSyncing ? Colors.blue : Colors.grey,
+            size: 20,
+          ),
+        ),
+        
+        // Manual sync button
+        if (!_isSyncing)
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _performManualSync,
+            tooltip: 'Manual Sync',
+          ),
+      ],
+    );
+  }
+
+  /// 🔄 NEW: Build sync status banner
+  Widget _buildSyncStatusBanner() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: _getSyncStatusColor(),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      margin: const EdgeInsets.all(16),
+      child: Row(
+        children: [
+          Icon(
+            _getSyncStatusIcon(),
+            color: Colors.white,
+            size: 20,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _syncStatus,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+                if (_lastSyncTime != null)
+                  Text(
+                    'Last sync: ${_getTimeAgo(_lastSyncTime)}',
+                    style: const TextStyle(
+                      color: Colors.white70,
+                      fontSize: 12,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          if (_isSyncing)
+            const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Color _getSyncStatusColor() {
+    if (_isSyncing) return Colors.blue;
+    if (_syncStatus.contains('failed') || _syncStatus.contains('error')) return Colors.red;
+    if (_syncStatus.contains('completed')) return Colors.green;
+    return Colors.grey;
+  }
+
+  IconData _getSyncStatusIcon() {
+    if (_isSyncing) return Icons.sync;
+    if (_syncStatus.contains('failed') || _syncStatus.contains('error')) return Icons.error;
+    if (_syncStatus.contains('completed')) return Icons.check_circle;
+    return Icons.info;
+  }
+
+  Future<void> _attemptDatabaseRepair() async {
+    try {
+      print('Attempting automatic database repair...');
+      
+      setState(() {
+        _isLoading = true;
+      });
+      
+      // Try to force re-seed the database
+      await _dbInitService.forceReseed();
+      
+      // Reload data
+      await _loadData();
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Database refreshed successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+      
+    } catch (e) {
+      print('Database repair failed: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Database repair failed: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
         setState(() {
           _isLoading = false;
         });

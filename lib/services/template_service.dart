@@ -392,4 +392,45 @@ class TemplateService {
       'category_keys': _categoryCache.keys.toList(),
     };
   }
+
+  /// Get essential templates for startup sync
+  Future<List<Template>> getEssentialTemplates() async {
+    try {
+      // Get all templates
+      final allTemplates = await fetchTemplates();
+      if (allTemplates == null || allTemplates.isEmpty) {
+        return [];
+      }
+
+      // Filter for essential templates (demo memorials, core content)
+      final essentialTemplates = allTemplates.where((template) {
+        // Check if template is for demo memorials
+        if (template.category.toLowerCase().contains('memorial') ||
+            template.category.toLowerCase().contains('demo')) {
+          return true;
+        }
+
+        // Check if template is recently updated (within last 7 days)
+        final templateAge = DateTime.now().difference(template.updatedAt);
+        if (templateAge.inDays < 7) {
+          return true;
+        }
+
+        return false;
+      }).toList();
+
+      // Sort by priority (then by update date)
+      essentialTemplates.sort((a, b) {
+        // Then by update date (newest first)
+        return b.updatedAt.compareTo(a.updatedAt);
+      });
+
+      // Limit to top 10 essential templates
+      return essentialTemplates.take(10).toList();
+
+    } catch (e) {
+      print('Error getting essential templates: $e');
+      return [];
+    }
+  }
 } 

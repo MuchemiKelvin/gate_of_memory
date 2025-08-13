@@ -92,21 +92,51 @@ class MemorialService {
 
   /// Get memorial by QR code
   Future<Memorial?> getMemorialByQRCode(String qrCode) async {
+    print('=== GET MEMORIAL BY QR CODE DEBUG ===');
+    print('Searching for QR code: "$qrCode"');
+    
     try {
       final db = await _dbHelper.database;
+      print('✓ Database connection established');
+      
       final List<Map<String, dynamic>> maps = await db.query(
         'memorials',
         where: 'qr_code = ? AND deleted_at IS NULL',
         whereArgs: [qrCode],
       );
+      
+      print('✓ Database query completed');
+      print('  - Query result count: ${maps.length}');
+      
       if (maps.isNotEmpty) {
-        return _mapToMemorial(maps.first);
+        print('✓ Memorial found in database:');
+        print('  - Raw data: ${maps.first}');
+        
+        final memorial = _mapToMemorial(maps.first);
+        print('✓ Memorial object created:');
+        print('  - ID: ${memorial.id}');
+        print('  - Name: ${memorial.name}');
+        print('  - QR Code: ${memorial.qrCode}');
+        
+        return memorial;
+      } else {
+        print('❌ No memorial found with QR code: $qrCode');
+        
+        // Let's check what QR codes are actually in the database
+        final allMemorials = await db.query('memorials', where: 'deleted_at IS NULL');
+        print('  - Total memorials in database: ${allMemorials.length}');
+        for (final memorial in allMemorials) {
+          print('    - ID: ${memorial['id']}, Name: ${memorial['name']}, QR: "${memorial['qr_code']}"');
+        }
+        
+        return null;
       }
-      return null;
     } catch (e) {
-      print('Error getting memorial by QR code: $e');
+      print('❌ Error getting memorial by QR code: $e');
       return null;
     }
+    
+    print('=== END GET MEMORIAL BY QR CODE DEBUG ===');
   }
 
   /// Validate QR code exists in database

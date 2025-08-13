@@ -135,7 +135,7 @@ class _ScanScreenState extends State<ScanScreen> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => ImagesPage(memorialId: memorial.id.toString()),
+                        builder: (_) => ImagesPage(memorialId: memorial.qrCode),
                       ),
                     );
                   },
@@ -150,7 +150,7 @@ class _ScanScreenState extends State<ScanScreen> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => VideosPage(memorialId: memorial.id.toString()),
+                        builder: (_) => VideosPage(memorialId: memorial.qrCode),
                       ),
                     );
                   },
@@ -165,7 +165,7 @@ class _ScanScreenState extends State<ScanScreen> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => AudioPage(memorialId: memorial.id.toString()),
+                        builder: (_) => AudioPage(memorialId: memorial.qrCode),
                       ),
                     );
                   },
@@ -180,7 +180,7 @@ class _ScanScreenState extends State<ScanScreen> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => StoriesPage(memorialId: memorial.id.toString()),
+                        builder: (_) => StoriesPage(memorialId: memorial.qrCode),
                       ),
                     );
                   },

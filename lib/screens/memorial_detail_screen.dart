@@ -152,6 +152,17 @@ class MemorialDetailScreen extends StatelessWidget {
   }
 
   Widget _buildContentSections(BuildContext context) {
+    // Add debug logging to see what data we have
+    print('=== MEMORIAL DETAIL DEBUG ===');
+    print('Memorial ID: ${memorial.id}');
+    print('Memorial Name: ${memorial.name}');
+    print('Image Path: "${memorial.imagePath}" (isEmpty: ${memorial.imagePath.isEmpty})');
+    print('Video Path: "${memorial.videoPath}" (isEmpty: ${memorial.videoPath.isEmpty})');
+    print('Hologram Path: "${memorial.hologramPath}" (isEmpty: ${memorial.hologramPath.isEmpty})');
+    print('Audio Paths: ${memorial.audioPaths} (isEmpty: ${memorial.audioPaths.isEmpty})');
+    print('Stories: ${memorial.stories.length} stories (isEmpty: ${memorial.stories.isEmpty})');
+    print('=== END DEBUG ===');
+    
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
@@ -173,6 +184,135 @@ class MemorialDetailScreen extends StatelessWidget {
   }
 
   Widget _buildContentGrid(BuildContext context) {
+    print('=== BUILDING CONTENT GRID ===');
+    
+    final List<Widget> contentCards = [];
+    
+    if (memorial.imagePath.isNotEmpty) {
+      print('✓ Adding Images card - Path: ${memorial.imagePath}');
+      contentCards.add(
+        _buildContentCard(
+          context,
+          'Images',
+          Icons.photo_library,
+          Colors.blue,
+          () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => ImagesPage(
+                  memorialId: memorial.qrCode,
+                ),
+              ),
+            );
+          },
+        ),
+      );
+    } else {
+      print('✗ Skipping Images card - Path is empty');
+    }
+    
+    if (memorial.videoPath.isNotEmpty) {
+      print('✓ Adding Videos card - Path: ${memorial.videoPath}');
+      contentCards.add(
+        _buildContentCard(
+          context,
+          'Videos',
+          Icons.videocam,
+          Colors.red,
+          () {
+            print('Opening video page with paths: [${memorial.videoPath}]');
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => VideosPage(
+                  memorialId: memorial.qrCode,
+                ),
+              ),
+            );
+          },
+        ),
+      );
+    } else {
+      print('✗ Skipping Videos card - Path is empty');
+    }
+    
+    if (memorial.audioPaths.isNotEmpty) {
+      print('✓ Adding Audio card - Paths: ${memorial.audioPaths}');
+      contentCards.add(
+        _buildContentCard(
+          context,
+          'Audio',
+          Icons.audiotrack,
+          Colors.orange,
+          () {
+            print('Opening audio page with paths: ${memorial.audioPaths}');
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => AudioPage(
+                  memorialId: memorial.qrCode,
+                ),
+              ),
+            );
+          },
+        ),
+      );
+    } else {
+      print('✗ Skipping Audio card - Paths are empty');
+    }
+    
+    if (memorial.stories.isNotEmpty) {
+      print('✓ Adding Stories card - ${memorial.stories.length} stories');
+      contentCards.add(
+        _buildContentCard(
+          context,
+          'Stories',
+          Icons.book,
+          Colors.green,
+          () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => StoriesPage(
+                  memorialId: memorial.qrCode,
+                ),
+              ),
+            );
+          },
+        ),
+      );
+    } else {
+      print('✗ Skipping Stories card - No stories');
+    }
+    
+    if (memorial.hologramPath.isNotEmpty) {
+      print('✓ Adding Hologram card - Path: ${memorial.hologramPath}');
+      contentCards.add(
+        _buildContentCard(
+          context,
+          'Hologram',
+          Icons.view_in_ar,
+          Colors.purple,
+          () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => HologramsPage(
+                  hologramPaths: [memorial.hologramPath],
+                ),
+              ),
+            );
+          },
+        ),
+      );
+    } else {
+      print('✗ Skipping Hologram card - Path is empty');
+    }
+    
+    print('Total content cards created: ${contentCards.length}');
+    print('=== END CONTENT GRID ===');
+    
     return GridView.count(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -180,95 +320,7 @@ class MemorialDetailScreen extends StatelessWidget {
       crossAxisSpacing: 16,
       mainAxisSpacing: 16,
       childAspectRatio: 1.2,
-      children: [
-        if (memorial.imagePath.isNotEmpty)
-          _buildContentCard(
-            context,
-            'Images',
-            Icons.photo_library,
-            Colors.blue,
-            () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => ImagesPage(
-                    memorialId: memorial.qrCode,
-                  ),
-                ),
-              );
-            },
-          ),
-        if (memorial.videoPath.isNotEmpty)
-          _buildContentCard(
-            context,
-            'Videos',
-            Icons.videocam,
-            Colors.red,
-            () {
-              print('Opening video page with paths: [${memorial.videoPath}]');
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => VideosPage(
-                    memorialId: memorial.qrCode,
-                  ),
-                ),
-              );
-            },
-          ),
-        if (memorial.audioPaths.isNotEmpty)
-          _buildContentCard(
-            context,
-            'Audio',
-            Icons.audiotrack,
-            Colors.orange,
-            () {
-              print('Opening audio page with paths: ${memorial.audioPaths}');
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => AudioPage(
-                    memorialId: memorial.qrCode,
-                  ),
-                ),
-              );
-            },
-          ),
-        if (memorial.stories.isNotEmpty)
-          _buildContentCard(
-            context,
-            'Stories',
-            Icons.book,
-            Colors.green,
-            () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => StoriesPage(
-                    memorialId: memorial.qrCode,
-                  ),
-                ),
-              );
-            },
-          ),
-        if (memorial.hologramPath.isNotEmpty)
-          _buildContentCard(
-            context,
-            'Hologram',
-            Icons.view_in_ar,
-            Colors.purple,
-            () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => HologramsPage(
-                    hologramPaths: [memorial.hologramPath],
-                  ),
-                ),
-              );
-            },
-          ),
-      ],
+      children: contentCards,
     );
   }
 

@@ -1,318 +1,168 @@
 import 'package:flutter/material.dart';
-import 'package:camera/camera.dart';
-import 'package:permission_handler/permission_handler.dart';
-import 'dart:async';
-import 'real_qr_detection_service.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
+import '../models/memorial.dart';
+import 'qr_code_service.dart';
 
+/// Service for handling real camera operations
 class RealCameraService {
   static final RealCameraService _instance = RealCameraService._internal();
   factory RealCameraService() => _instance;
   RealCameraService._internal();
 
-  CameraController? _cameraController;
-  List<CameraDescription> _cameras = [];
-  int _selectedCameraIndex = 0;
-  
+  final QRCodeService _qrService = QRCodeService();
+  MobileScannerController? _controller;
   bool _isInitialized = false;
   bool _hasPermission = false;
-  bool _isPreviewActive = false;
-  double _zoomLevel = 1.0;
-  bool _flashEnabled = false;
-  bool _autoFocusEnabled = true;
-  DateTime? _lastFrameProcessedAt;
-
-  // Stream controllers
-  final StreamController<Map<String, dynamic>> _frameDataController = StreamController<Map<String, dynamic>>.broadcast();
-  final StreamController<String> _statusController = StreamController<String>.broadcast();
 
   // Getters
   bool get isInitialized => _isInitialized;
   bool get hasPermission => _hasPermission;
-  bool get isPreviewActive => _isPreviewActive;
-  CameraController? get cameraController => _cameraController;
-  List<CameraDescription> get cameras => _cameras;
-  int get selectedCameraIndex => _selectedCameraIndex;
-  double get zoomLevel => _zoomLevel;
-  bool get flashEnabled => _flashEnabled;
-  bool get autoFocusEnabled => _autoFocusEnabled;
-  Stream<Map<String, dynamic>> get frameDataStream => _frameDataController.stream;
-  Stream<String> get statusStream => _statusController.stream;
+  MobileScannerController? get controller => _controller;
 
-  /// Initialize real camera service
+  /// Initialize the camera service
   Future<bool> initialize() async {
     try {
       print('Initializing real camera service...');
       
-      // Check camera permission first
-      var status = await Permission.camera.status;
-      if (status == PermissionStatus.denied) {
-        // Request camera permission
-        status = await Permission.camera.request();
-      }
+      // Create controller
+      _controller = MobileScannerController();
       
-      if (status != PermissionStatus.granted) {
+      // Check permissions
+      _hasPermission = await _checkCameraPermission();
+      
+      if (_hasPermission) {
+        _isInitialized = true;
+        print('Real camera service initialized successfully');
+        return true;
+      } else {
         print('Camera permission denied');
-        _statusController.add('Camera permission denied');
         return false;
       }
-      
-      _hasPermission = true;
-      _statusController.add('Camera permission granted');
-
-      // Get available cameras
-      _cameras = await availableCameras();
-      if (_cameras.isEmpty) {
-        print('No cameras available');
-        _statusController.add('No cameras available');
-        return false;
-      }
-
-      print('Found ${_cameras.length} cameras');
-      _statusController.add('Found ${_cameras.length} cameras');
-
-      // Initialize camera controller
-      await _initializeCameraController();
-      
-      _isInitialized = true;
-      _statusController.add('Camera initialized successfully');
-      print('Real camera service initialized successfully');
-      return true;
     } catch (e) {
       print('Error initializing real camera service: $e');
-      _statusController.add('Camera initialization failed: $e');
       return false;
     }
   }
 
-  /// Initialize camera controller
-  Future<void> _initializeCameraController() async {
+  /// Check camera permission
+  Future<bool> _checkCameraPermission() async {
     try {
-      _cameraController?.dispose();
-      
-      _cameraController = CameraController(
-        _cameras[_selectedCameraIndex],
-        ResolutionPreset.medium,
-        enableAudio: false,
-        imageFormatGroup: ImageFormatGroup.yuv420,
-      );
-
-      await _cameraController!.initialize();
-      
-      // Set initial camera settings (with error handling)
-      try {
-        await _cameraController!.setZoomLevel(_zoomLevel);
-      } catch (e) {
-        print('Zoom setting failed (non-critical): $e');
-      }
-      
-      try {
-        await _cameraController!.setFlashMode(_flashEnabled ? FlashMode.torch : FlashMode.off);
-      } catch (e) {
-        print('Flash setting failed (non-critical): $e');
-      }
-      
-      print('Camera controller initialized');
-      _statusController.add('Camera controller ready');
+      // For mobile_scanner, permissions are handled automatically
+      // This is a placeholder for future permission handling
+      return true;
     } catch (e) {
-      print('Error initializing camera controller: $e');
-      _statusController.add('Camera controller failed: $e');
-      rethrow;
+      print('Error checking camera permission: $e');
+      return false;
     }
   }
 
   /// Start camera preview
-  Future<void> startPreview() async {
-    if (!_isInitialized || _cameraController == null) {
-      print('Camera not initialized');
-      return;
-    }
-
+  Future<bool> startCamera() async {
     try {
-      // Start image stream for QR detection
-      await _cameraController!.startImageStream(_onImageStream);
-      _isPreviewActive = true;
-      _statusController.add('Camera preview started');
-      print('Real camera preview started');
-    } catch (e) {
-      print('Error starting camera preview: $e');
-      _statusController.add('Camera preview failed: $e');
-      
-      // Try alternative approach without image stream
-      try {
-        print('Trying alternative camera preview...');
-        _isPreviewActive = true;
-        _statusController.add('Camera preview started (basic mode)');
-        print('Real camera preview started (basic mode)');
-      } catch (e2) {
-        print('Alternative camera preview also failed: $e2');
-        _statusController.add('Camera preview failed completely: $e2');
+      if (!_isInitialized || _controller == null) {
+        print('Camera service not initialized');
+        return false;
       }
+
+      await _controller!.start();
+      print('Camera started successfully');
+      return true;
+    } catch (e) {
+      print('Error starting camera: $e');
+      return false;
     }
   }
 
   /// Stop camera preview
-  Future<void> stopPreview() async {
+  Future<bool> stopCamera() async {
     try {
-      await _cameraController?.stopImageStream();
-      _isPreviewActive = false;
-      _statusController.add('Camera preview stopped');
-      print('Real camera preview stopped');
+      if (_controller == null) {
+        return false;
+      }
+
+      await _controller!.stop();
+      print('Camera stopped successfully');
+      return true;
     } catch (e) {
-      print('Error stopping camera preview: $e');
-      _statusController.add('Camera stop failed: $e');
+      print('Error stopping camera: $e');
+      return false;
     }
   }
 
-  /// Process camera image stream
-  void _onImageStream(CameraImage image) {
-    if (!_isPreviewActive) return;
-
+  /// Toggle camera flash
+  Future<bool> toggleFlash() async {
     try {
-      // Process image for AR marker detection
-      final frameData = {
-        'timestamp': DateTime.now().millisecondsSinceEpoch,
-        'width': image.width,
-        'height': image.height,
-        'format': image.format.raw,
-        'planes': image.planes.length,
-        'zoom': _zoomLevel,
-        'flash': _flashEnabled,
-        'autoFocus': _autoFocusEnabled,
-      };
-
-      _frameDataController.add(frameData);
-
-      // Throttle and forward frames to QR detection service when active
-      final now = DateTime.now();
-      final shouldProcess = _lastFrameProcessedAt == null ||
-          now.difference(_lastFrameProcessedAt!).inMilliseconds > 150;
-      if (shouldProcess) {
-        _lastFrameProcessedAt = now;
-        try {
-          final qrService = RealQRDetectionService();
-          if (qrService.isInitialized && qrService.isDetecting) {
-            qrService.processFrame(image);
-          }
-        } catch (e) {
-          print('Error passing frame to QR detection: $e');
-        }
+      if (_controller == null) {
+        return false;
       }
+
+      await _controller!.toggleTorch();
+      print('Flash toggled successfully');
+      return true;
     } catch (e) {
-      print('Error processing camera frame: $e');
+      print('Error toggling flash: $e');
+      return false;
     }
   }
 
   /// Switch camera (front/back)
-  Future<void> switchCamera() async {
-    if (_cameras.length < 2) {
-      print('Only one camera available');
-      _statusController.add('Only one camera available');
-      return;
-    }
-
+  Future<bool> switchCamera() async {
     try {
-      _selectedCameraIndex = (_selectedCameraIndex + 1) % _cameras.length;
-      await _initializeCameraController();
-      
-      if (_isPreviewActive) {
-        await startPreview();
+      if (_controller == null) {
+        return false;
       }
-      
-      _statusController.add('Camera switched to ${_cameras[_selectedCameraIndex].name}');
-      print('Camera switched to ${_cameras[_selectedCameraIndex].name}');
+
+      await _controller!.switchCamera();
+      print('Camera switched successfully');
+      return true;
     } catch (e) {
       print('Error switching camera: $e');
-      _statusController.add('Camera switch failed: $e');
+      return false;
     }
   }
 
-  /// Set zoom level
-  Future<void> setZoomLevel(double zoom) async {
+  /// Capture image
+  Future<String?> captureImage() async {
     try {
-      _zoomLevel = zoom.clamp(1.0, 10.0);
-      await _cameraController?.setZoomLevel(_zoomLevel);
-      _statusController.add('Zoom set to ${_zoomLevel.toStringAsFixed(1)}x');
-      print('Zoom set to ${_zoomLevel.toStringAsFixed(1)}x');
-    } catch (e) {
-      print('Error setting zoom: $e');
-      _statusController.add('Zoom setting failed: $e');
-    }
-  }
+      if (_controller == null) {
+        return null;
+      }
 
-  /// Toggle flash
-  Future<void> toggleFlash() async {
-    try {
-      _flashEnabled = !_flashEnabled;
-      await _cameraController?.setFlashMode(_flashEnabled ? FlashMode.torch : FlashMode.off);
-      _statusController.add('Flash ${_flashEnabled ? 'enabled' : 'disabled'}');
-      print('Flash ${_flashEnabled ? 'enabled' : 'disabled'}');
-    } catch (e) {
-      print('Error toggling flash: $e');
-      _statusController.add('Flash toggle failed: $e');
-    }
-  }
-
-  /// Toggle auto focus
-  Future<void> toggleAutoFocus() async {
-    try {
-      _autoFocusEnabled = !_autoFocusEnabled;
-      await _cameraController?.setFocusMode(_autoFocusEnabled ? FocusMode.auto : FocusMode.locked);
-      _statusController.add('Auto focus ${_autoFocusEnabled ? 'enabled' : 'disabled'}');
-      print('Auto focus ${_autoFocusEnabled ? 'enabled' : 'disabled'}');
-    } catch (e) {
-      print('Error toggling auto focus: $e');
-      _statusController.add('Auto focus toggle failed: $e');
-    }
-  }
-
-  /// Take photo
-  Future<String?> takePhoto() async {
-    if (!_isPreviewActive || _cameraController == null) {
-      print('Camera not ready for photo');
+      // For mobile_scanner, we capture QR codes, not images
+      // This method is a placeholder for future image capture functionality
+      print('Image capture not implemented for QR scanner');
       return null;
-    }
-
-    try {
-      final image = await _cameraController!.takePicture();
-      _statusController.add('Photo captured: ${image.path}');
-      print('Photo captured: ${image.path}');
-      return image.path;
     } catch (e) {
-      print('Error taking photo: $e');
-      _statusController.add('Photo capture failed: $e');
+      print('Error capturing image: $e');
       return null;
     }
   }
 
   /// Get camera status
-  String getStatus() {
-    if (!_isInitialized) return 'Not initialized';
-    if (!_hasPermission) return 'No permission';
-    if (_cameraController == null) return 'No camera controller';
-    if (!_isPreviewActive) return 'Preview not active';
-    return 'Active - ${_cameras[_selectedCameraIndex].name}';
-  }
-
-  /// Get camera info
-  Map<String, dynamic> getCameraInfo() {
+  Map<String, dynamic> getCameraStatus() {
     return {
       'isInitialized': _isInitialized,
       'hasPermission': _hasPermission,
-      'isPreviewActive': _isPreviewActive,
-      'cameraCount': _cameras.length,
-      'currentCamera': _cameras.isNotEmpty ? _cameras[_selectedCameraIndex].name : 'None',
-      'zoomLevel': _zoomLevel,
-      'flashEnabled': _flashEnabled,
-      'autoFocusEnabled': _autoFocusEnabled,
+      'controllerExists': _controller != null,
+      'isRunning': _controller?.isStarting ?? false,
     };
   }
 
-  /// Dispose camera service
+  /// Dispose camera resources
   void dispose() {
-    _cameraController?.dispose();
-    // Don't close stream controllers for singleton pattern
-    // _frameDataController.close();
-    // _statusController.close();
-    print('Real camera service disposed');
+    try {
+      _controller?.dispose();
+      _controller = null;
+      _isInitialized = false;
+      print('Real camera service disposed');
+    } catch (e) {
+      print('Error disposing camera service: $e');
+    }
+  }
+
+  /// Reset camera service
+  void reset() {
+    dispose();
+    _hasPermission = false;
   }
 } 

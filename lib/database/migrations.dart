@@ -65,6 +65,20 @@ class DatabaseMigrations {
       )
     ''');
 
+    // Create sync_log table
+    await db.execute('''
+      CREATE TABLE sync_log (
+        id INTEGER PRIMARY KEY,
+        operation TEXT NOT NULL,
+        table_name TEXT NOT NULL,
+        record_id INTEGER,
+        status TEXT NOT NULL,
+        error_message TEXT,
+        sync_timestamp TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      )
+    ''');
+
     print('Migration to version 1 completed');
   }
 
@@ -132,6 +146,32 @@ class DatabaseMigrations {
 
   static Future<void> migrateToVersion3(Database db) async {
     print('Migrating to version 3...');
+    
+    // Ensure sync_log table exists (fix for missing table issue)
+    try {
+      final syncLogExists = await db.rawQuery('SELECT name FROM sqlite_master WHERE type="table" AND name="sync_log"');
+      if (syncLogExists.isEmpty) {
+        print('Creating missing sync_log table...');
+        await db.execute('''
+          CREATE TABLE sync_log (
+            id INTEGER PRIMARY KEY,
+            operation TEXT NOT NULL,
+            table_name TEXT NOT NULL,
+            record_id INTEGER,
+            status TEXT NOT NULL,
+            error_message TEXT,
+            sync_timestamp TEXT NOT NULL,
+            created_at TEXT NOT NULL
+          )
+        ''');
+        print('sync_log table created successfully');
+      } else {
+        print('sync_log table already exists');
+      }
+    } catch (e) {
+      print('Error creating sync_log table: $e');
+    }
+    
     // Inspect existing media table schema
     try {
       final columns = await db.rawQuery('PRAGMA table_info(media)');

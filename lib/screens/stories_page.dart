@@ -27,7 +27,11 @@ class _StoriesPageState extends State<StoriesPage> {
   }
 
   Future<void> _loadMemorialData() async {
+    print('=== STORIES PAGE DEBUG ===');
+    print('Memorial ID (QR Code): ${widget.memorialId}');
+    
     if (widget.memorialId == null) {
+      print('✗ No memorial ID provided');
       setState(() {
         isLoading = false;
       });
@@ -37,24 +41,33 @@ class _StoriesPageState extends State<StoriesPage> {
     try {
       final memorialService = MemorialService();
       final memorials = await memorialService.getAllMemorials();
+      print('✓ Loaded ${memorials.length} memorials from database');
       
-      // Find memorial by ID
+      // Find memorial by QR code (not ID)
       final foundMemorial = memorials.firstWhere(
-        (m) => m.id.toString() == widget.memorialId,
-        orElse: () => throw Exception('Memorial not found'),
+        (m) => m.qrCode == widget.memorialId,
+        orElse: () => throw Exception('Memorial not found with QR code: ${widget.memorialId}'),
       );
+      
+      print('✓ Found memorial: ${foundMemorial.name}');
+      print('  - Stories: ${foundMemorial.stories.length} stories');
+      print('  - Stories isEmpty: ${foundMemorial.stories.isEmpty}');
 
       setState(() {
         memorial = foundMemorial;
         stories = foundMemorial.stories;
         isLoading = false;
       });
+      
+      print('✓ State updated successfully');
     } catch (e) {
-      print('Error loading memorial data: $e');
+      print('❌ Error loading memorial data: $e');
       setState(() {
         isLoading = false;
       });
     }
+    
+    print('=== END STORIES PAGE DEBUG ===');
   }
 
   void _openStoryReader(int index) {

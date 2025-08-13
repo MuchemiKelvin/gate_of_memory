@@ -28,7 +28,11 @@ class _VideosPageState extends State<VideosPage> {
   }
 
   Future<void> _loadMemorialData() async {
+    print('=== VIDEOS PAGE DEBUG ===');
+    print('Memorial ID (QR Code): ${widget.memorialId}');
+    
     if (widget.memorialId == null) {
+      print('✗ No memorial ID provided');
       setState(() {
         isLoading = false;
       });
@@ -38,24 +42,36 @@ class _VideosPageState extends State<VideosPage> {
     try {
       final memorialService = MemorialService();
       final memorials = await memorialService.getAllMemorials();
+      print('✓ Loaded ${memorials.length} memorials from database');
       
-      // Find memorial by ID
+      // Find memorial by QR code (not ID)
       final foundMemorial = memorials.firstWhere(
-        (m) => m.id.toString() == widget.memorialId,
-        orElse: () => throw Exception('Memorial not found'),
+        (m) => m.qrCode == widget.memorialId,
+        orElse: () => throw Exception('Memorial not found with QR code: ${widget.memorialId}'),
       );
+      
+      print('✓ Found memorial: ${foundMemorial.name}');
+      print('  - Video Path: "${foundMemorial.videoPath}"');
+      print('  - Video Path isEmpty: ${foundMemorial.videoPath.isEmpty}');
+      
+      final videoPaths = [foundMemorial.videoPath].where((path) => path != null && path.isNotEmpty).toList();
+      print('✓ Filtered video paths: $videoPaths (count: ${videoPaths.length})');
 
       setState(() {
         memorial = foundMemorial;
-        videoPaths = [foundMemorial.videoPath].where((path) => path != null && path.isNotEmpty).toList();
+        this.videoPaths = videoPaths;
         isLoading = false;
       });
+      
+      print('✓ State updated successfully');
     } catch (e) {
-      print('Error loading memorial data: $e');
+      print('❌ Error loading memorial data: $e');
       setState(() {
         isLoading = false;
       });
     }
+    
+    print('=== END VIDEOS PAGE DEBUG ===');
   }
 
   void _openVideoPlayer(int index) {

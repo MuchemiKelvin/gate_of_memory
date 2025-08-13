@@ -58,7 +58,14 @@ class DatabaseInitService {
     
     for (final table in requiredTables) {
       if (!tableNames.contains(table)) {
-        throw Exception('Required table "$table" is missing from database');
+        print('Warning: Required table "$table" is missing from database. Attempting to create...');
+        try {
+          await _createMissingTable(db, table);
+          print('Successfully created missing table: $table');
+        } catch (e) {
+          print('Failed to create missing table $table: $e');
+          throw Exception('Required table "$table" is missing from database and could not be created: $e');
+        }
       }
     }
     
@@ -69,6 +76,89 @@ class DatabaseInitService {
     }
     
     print('Database integrity validation passed');
+  }
+
+  // Create missing table if needed
+  Future<void> _createMissingTable(Database db, String tableName) async {
+    switch (tableName) {
+      case 'sync_log':
+        await db.execute('''
+          CREATE TABLE sync_log (
+            id INTEGER PRIMARY KEY,
+            operation TEXT NOT NULL,
+            table_name TEXT NOT NULL,
+            record_id INTEGER,
+            status TEXT NOT NULL,
+            error_message TEXT,
+            sync_timestamp TEXT NOT NULL,
+            created_at TEXT NOT NULL
+          )
+        ''');
+        break;
+      case 'categories':
+        await db.execute('''
+          CREATE TABLE categories (
+            id INTEGER PRIMARY KEY,
+            name TEXT NOT NULL,
+            description TEXT,
+            icon TEXT,
+            color TEXT,
+            sort_order INTEGER DEFAULT 0,
+            memorial_count INTEGER DEFAULT 0,
+            status TEXT DEFAULT 'active',
+            sync_status TEXT DEFAULT 'synced',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+          )
+        ''');
+        break;
+      case 'memorials':
+        await db.execute('''
+          CREATE TABLE memorials (
+            id INTEGER PRIMARY KEY,
+            name TEXT NOT NULL,
+            description TEXT,
+            category TEXT DEFAULT 'memorial',
+            version TEXT DEFAULT '1.0',
+            image_path TEXT,
+            video_path TEXT,
+            hologram_path TEXT,
+            audio_paths TEXT,
+            stories TEXT,
+            qr_code TEXT,
+            status TEXT DEFAULT 'active',
+            sync_status TEXT DEFAULT 'synced',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            deleted_at TEXT
+          )
+        ''');
+        break;
+      case 'media':
+        await db.execute('''
+          CREATE TABLE media (
+            id INTEGER PRIMARY KEY,
+            memorial_id INTEGER,
+            type TEXT NOT NULL,
+            title TEXT,
+            description TEXT,
+            local_path TEXT,
+            remote_url TEXT,
+            file_size INTEGER,
+            file_type TEXT,
+            mime_type TEXT,
+            metadata TEXT,
+            status TEXT DEFAULT 'active',
+            sync_status TEXT DEFAULT 'synced',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY (memorial_id) REFERENCES memorials (id)
+          )
+        ''');
+        break;
+      default:
+        throw Exception('Unknown table type: $tableName');
+    }
   }
 
   // Seed initial data
@@ -131,10 +221,10 @@ class DatabaseInitService {
         'description': 'A beloved mother and community leader who touched countless lives with her warmth and wisdom. Known for her exceptional cooking skills and ability to bring people together.',
         'category': 'Memorial',
         'version': '1.0',
-        'imagePath': 'assets/images/naomi_memorial.jpeg',
-        'videoPath': 'assets/video/naomi_memorial_video.mp4',
-        'hologramPath': 'assets/animation/naomi_hologram.mp4',
-        'audioPaths': ['assets/audio/naomi_voice_message.mp3', 'assets/audio/victory_chime.mp3'],
+        'image_path': 'assets/images/naomi_memorial.jpeg',
+        'video_path': 'assets/video/naomi_memorial_video.mp4',
+        'hologram_path': 'assets/animation/naomi_hologram.mp4',
+        'audio_paths': ['assets/audio/naomi_voice_message.mp3', 'assets/audio/victory_chime.mp3'],
         'stories': [
           {
             'title': 'Early Life & Family',
@@ -152,9 +242,9 @@ class DatabaseInitService {
             'fullText': 'Naomi\'s greatest legacy was her ability to love unconditionally. She raised three children of her own, but was a mother figure to dozens more in her community. Her home was always open, her table always had an extra place setting, and her heart had room for everyone. She taught us that family isn\'t just about blood, but about the bonds we create with those around us.',
           },
         ],
-        'qrCode': 'NAOMI-N-MEMORIAL-001',
+        'qr_code': 'NAOMI-N-MEMORIAL-001',
         'status': 'active',
-        'syncStatus': 'synced',
+        'sync_status': 'synced',
       },
       {
         'id': 2,
@@ -162,10 +252,10 @@ class DatabaseInitService {
         'description': 'A dedicated teacher who inspired generations of students to pursue their dreams. His innovative teaching methods and unwavering support changed countless lives.',
         'category': 'Celebration',
         'version': '1.0',
-        'imagePath': 'assets/images/john_memorial.jpeg',
-        'videoPath': 'assets/video/john_memorial_video.mp4',
-        'hologramPath': 'assets/animation/john_hologram.mp4',
-        'audioPaths': ['assets/audio/john_teaching_audio.mp3'],
+        'image_path': 'assets/images/john_memorial.jpeg',
+        'video_path': 'assets/video/john_memorial_video.mp4',
+        'hologram_path': 'assets/animation/john_hologram.mp4',
+        'audio_paths': ['assets/audio/john_teaching_audio.mp3'],
         'stories': [
           {
             'title': 'Teaching Career & Innovation',
@@ -183,9 +273,9 @@ class DatabaseInitService {
             'fullText': 'John\'s influence extended far beyond the school walls. He organized community math nights, helped adults earn their GEDs, and volunteered at the local library. He believed that education was the key to breaking cycles of poverty and worked tirelessly to make learning accessible to everyone. His legacy lives on in the thousands of lives he touched and the educational programs he helped establish.',
           },
         ],
-        'qrCode': 'JOHN-M-MEMORIAL-002',
+        'qr_code': 'JOHN-M-MEMORIAL-002',
         'status': 'active',
-        'syncStatus': 'synced',
+        'sync_status': 'synced',
       },
       {
         'id': 3,
@@ -193,10 +283,10 @@ class DatabaseInitService {
         'description': 'A pioneering scientist whose research advanced our understanding of renewable energy. Her groundbreaking work in solar technology and environmental advocacy continues to impact the world.',
         'category': 'Tribute',
         'version': '1.0',
-        'imagePath': 'assets/images/sarah_memorial.jpeg',
-        'videoPath': 'assets/video/sarah_memorial_video.mp4',
-        'hologramPath': 'assets/animation/sarah_hologram.mp4',
-        'audioPaths': ['assets/audio/sarah_scientific_talk.mp3'],
+        'image_path': 'assets/images/sarah_memorial.jpeg',
+        'video_path': 'assets/video/sarah_memorial_video.mp4',
+        'hologram_path': 'assets/animation/sarah_hologram.mp4',
+        'audio_paths': ['assets/audio/sarah_scientific_talk.mp3'],
         'stories': [
           {
             'title': 'Scientific Breakthroughs & Innovation',
@@ -214,9 +304,9 @@ class DatabaseInitService {
             'fullText': 'Sarah was committed to inspiring the next generation of scientists. She mentored over 50 graduate students and postdoctoral researchers, many of whom have gone on to become leaders in renewable energy research. She established scholarship programs for women in STEM and regularly visited schools to encourage young people, especially girls, to pursue careers in science and engineering.',
           },
         ],
-        'qrCode': 'SARAH-K-MEMORIAL-003',
+        'qr_code': 'SARAH-K-MEMORIAL-003',
         'status': 'active',
-        'syncStatus': 'synced',
+        'sync_status': 'synced',
       },
     ];
 
@@ -252,6 +342,12 @@ class DatabaseInitService {
     print('Memorials in database: ${memorials.length}');
     for (final memorial in memorials) {
       print('  - ID: ${memorial['id']}, Name: ${memorial['name']}, Category: ${memorial['category']}');
+      print('    Image Path: "${memorial['image_path']}"');
+      print('    Video Path: "${memorial['video_path']}"');
+      print('    Hologram Path: "${memorial['hologram_path']}"');
+      print('    Audio Paths: "${memorial['audio_paths']}"');
+      print('    Stories: "${memorial['stories']}"');
+      print('    QR Code: "${memorial['qr_code']}"');
     }
     
     // Check media
@@ -259,6 +355,7 @@ class DatabaseInitService {
     print('Media in database: ${media.length}');
     for (final item in media) {
       print('  - ID: ${item['id']}, Memorial ID: ${item['memorial_id']}, Type: ${item['type']}, Title: ${item['title']}');
+      print('    Local Path: "${item['local_path']}"');
     }
     
     // Check categories
@@ -273,40 +370,56 @@ class DatabaseInitService {
 
   // Helper method to create Memorial object from data
   Memorial _createMemorialFromData(Map<String, dynamic> data) {
-    return Memorial(
+    print('=== CREATING MEMORIAL OBJECT ===');
+    print('Raw data: $data');
+    
+    final memorial = Memorial(
       id: data['id'],
       name: data['name'],
       description: data['description'],
       category: data['category'],
       version: data['version'],
-      imagePath: data['imagePath'],
-      videoPath: data['videoPath'],
-      hologramPath: data['hologramPath'],
-      audioPaths: List<String>.from(data['audioPaths']),
-      stories: (data['stories'] as List).map((storyData) => Story(
+      imagePath: data['image_path'] ?? data['imagePath'] ?? '',
+      videoPath: data['video_path'] ?? data['videoPath'] ?? '',
+      hologramPath: data['hologram_path'] ?? data['hologramPath'] ?? '',
+      audioPaths: List<String>.from(data['audio_paths'] ?? data['audioPaths'] ?? []),
+      stories: (data['stories'] as List?)?.map((storyData) => Story(
         title: storyData['title'],
         snippet: storyData['snippet'],
         fullText: storyData['fullText'],
-      )).toList(),
-      qrCode: data['qrCode'],
+      )).toList() ?? [],
+      qrCode: data['qr_code'] ?? data['qrCode'] ?? '',
       status: data['status'],
-      syncStatus: data['syncStatus'],
+      syncStatus: data['sync_status'] ?? data['syncStatus'] ?? 'synced',
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
     );
+    
+    print('Created Memorial object:');
+    print('  - ID: ${memorial.id}');
+    print('  - Name: ${memorial.name}');
+    print('  - Image Path: "${memorial.imagePath}"');
+    print('  - Video Path: "${memorial.videoPath}"');
+    print('  - Hologram Path: "${memorial.hologramPath}"');
+    print('  - Audio Paths: ${memorial.audioPaths}');
+    print('  - Stories: ${memorial.stories.length}');
+    print('  - QR Code: ${memorial.qrCode}');
+    print('=== END MEMORIAL OBJECT ===');
+    
+    return memorial;
   }
 
   // Helper method to add media for a memorial
   Future<void> _addMemorialMedia(int memorialId, Map<String, dynamic> memorialData) async {
     // Add image media
-    if (memorialData['imagePath'] != null) {
+    if (memorialData['image_path'] != null) {
       final imageMedia = {
         'id': memorialId * 10 + 1,
         'memorial_id': memorialId,
         'type': 'image',
         'title': '${memorialData['name']} - Main Image',
         'description': 'Primary memorial image',
-        'local_path': memorialData['imagePath'],
+        'local_path': memorialData['image_path'],
         'remote_url': '',
         'file_size': 0,
         'file_type': 'jpeg',
@@ -321,14 +434,14 @@ class DatabaseInitService {
     }
 
     // Add video media
-    if (memorialData['videoPath'] != null) {
+    if (memorialData['video_path'] != null) {
       final videoMedia = {
         'id': memorialId * 10 + 2,
         'memorial_id': memorialId,
         'type': 'video',
         'title': '${memorialData['name']} - Memorial Video',
         'description': 'Memorial tribute video',
-        'local_path': memorialData['videoPath'],
+        'local_path': memorialData['video_path'],
         'remote_url': '',
         'file_size': 0,
         'file_type': 'mp4',
@@ -343,14 +456,14 @@ class DatabaseInitService {
     }
 
     // Add hologram media
-    if (memorialData['hologramPath'] != null) {
+    if (memorialData['hologram_path'] != null) {
       final hologramMedia = {
         'id': memorialId * 10 + 3,
         'memorial_id': memorialId,
         'type': 'hologram',
         'title': '${memorialData['name']} - Hologram',
         'description': 'AR hologram content',
-        'local_path': memorialData['hologramPath'],
+        'local_path': memorialData['hologram_path'],
         'remote_url': '',
         'file_size': 0,
         'file_type': 'mp4',
